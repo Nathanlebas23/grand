@@ -85,6 +85,9 @@ def get_peak_time(trace, t0, channels, dt_ns=2):
     peak_time = (peak_idx * dt_ns + t0) * 1e-9  
     return peak_time
 
+def get_peak_time_adc(trace, t0, channels, dt_ns=2):
+    pass
+
 def convert_voltage_to_ADC(trace, channels, adc_full_scale=8192, voltage_ref=0.9):
     """
     Convert voltage traces to ADC counts.
