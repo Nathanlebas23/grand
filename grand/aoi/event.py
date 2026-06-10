@@ -819,8 +819,7 @@ class Event:
 
         # *** Writing to the current files (no output directory provided or same as current) ***
 
-        if out_dir is None or (isinstance(out_dir, str) and self._directory.dir_name==out_dir) or (isinstance(out_dir, DataDirectory) and self._directory.dir_name==out_dir.dir_name):
-            # Give common_filename to all the filenames if not specified
+        if out_dir is None or (isinstance(out_dir, str) and self._directory is not None and self._directory.dir_name==out_dir) or (isinstance(out_dir, DataDirectory) and self._directory is not None and self._directory.dir_name==out_dir.dir_name):    # Give common_filename to all the filenames if not specified
             if common_filename:
                 if not shower_filename: shower_filename = common_filename
                 if not efields_filename: efields_filename = common_filename
