@@ -35,6 +35,11 @@ def grand_add_path_data(s_file):
 
 
 from grand.geo import geomagnet, topography
+import grand.analysis.signals.extraction as ext
+import grand.analysis.fitting as fit
+import grand.analysis.constants as cons
+import grand.analysis.geom as geom
+import grand.analysis.energy_reco as en
 from grand.geo.topography import geoid_undulation, Reference, Topography
 from grand.geo import coordinates
 from grand.geo.geomagnet import Geomagnet
