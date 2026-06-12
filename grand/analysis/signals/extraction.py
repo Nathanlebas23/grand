@@ -1,7 +1,7 @@
 # Created by Marion Guelfand at 19/01/2026
 
 import numpy as np
-from scipy.signal import hilbert
+from scipy.signal import hilbert, convolve
 
 def get_peak_amplitude(trace, channels, return_envelope=False):
     """
@@ -56,7 +56,7 @@ def compute_t0(t_object):
     return t0
 
 
-def get_peak_time(trace, t0, channels, dt_ns=2):
+def get_peak_time_efield(trace, t0, channels, dt_ns=2):
     """
     Compute the time of the peak signal amplitude.
 
@@ -81,8 +81,36 @@ def get_peak_time(trace, t0, channels, dt_ns=2):
     """
     _, hilbert_amp = get_peak_amplitude(trace, channels, return_envelope=True)
     peak_idx = np.argmax(hilbert_amp)
-    #Convert sample index to time in seconds (2ns per sample)
+    # Convert sample index to time in seconds (2ns per sample by default)
     peak_time = (peak_idx * dt_ns + t0) * 1e-9  
+    return peak_time
+
+def get_peak_time_adc(trace, nutrig_template, t0, dt_ns=2):
+    """
+    Compute the time of the peak signal amplitude for ADC traces.
+
+    Parameters
+    ----------
+    trace : np.ndarray
+        1D array of shape (n_samples,).
+    nutrig_template : np.ndarray
+        Template signal from the NUTRIG analysis.
+    t0 : float or np.ndarray
+        Initial time offset(s) in nanoseconds for the antenna.
+    dt_ns : float, optional
+        Sampling time in nanoseconds (default is 2 ns).
+
+    Returns
+    -------
+    float or np.ndarray
+        Time of the peak amplitude in seconds.
+    """
+    convolution = convolve(trace, nutrig_template, mode='same')
+    convolution_hilbert = np.abs(hilbert(convolution))
+    peak_idx = np.argmax(convolution_hilbert)
+    # Convert sample index to time in seconds (2ns per sample by default)
+    peak_time = (peak_idx * dt_ns + t0) * 1e-9  
+
     return peak_time
 
 def convert_voltage_to_ADC(trace, channels, adc_full_scale=8192, voltage_ref=0.9):
