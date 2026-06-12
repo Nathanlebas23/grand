@@ -251,24 +251,6 @@ t_recons = TShower(f"{conf.output}")
 for ev_no, run_no in t_recons.get_list_of_events():
     t_recons.get_event(ev_no, run_no)
     
-    # print("__________________PWF__________________")
-    # print(f"Event {ev_no} Run {run_no}: zenith={np.rad2deg(t_recons.zenith_pwf)}, phi={np.rad2deg(t_recons.azimuth_pwf)}, chi2_pwf={t_recons.chi2_pwf}")
-
-    # print("__________________SWF__________________")
-    # print(f"Event {ev_no} Run {run_no}: zenith={np.rad2deg(t_recons.zenith_swf)}, phi={np.rad2deg(t_recons.azimuth_swf)}, " 
-    #       f"t_s={t_recons.t_s}, r_xsource={t_recons.r_xmax}, chi2_swf={t_recons.chi2_swf},"
-    #       f"Xsource={t_recons.Xsource}")
-    
-    # print("__________________ADF__________________")
-    # print(f"Event {ev_no} Run {run_no}: zenith={np.rad2deg(t_recons.zenith_adf)}, phi={np.rad2deg(t_recons.azimuth_adf)}, " 
-    #       f"width={t_recons.width}, scaling={t_recons.scaling_factor}, chi2_adf={t_recons.chi2_adf}, energy elm={t_recons.energy_elm_voltage},"
-    #       f"omega={np.rad2deg(t_recons.omega)},"
-    #       f"omega cherenkov={np.rad2deg(t_recons.omega_cr)},"
-    #       f"eta={np.rad2deg(t_recons.eta)},"
-    #       f"amplitude model={t_recons.adf_amplitude},"
-    #       f"l_ant={t_recons.distance_source_antenna}"
-    #   )
-    
     print("\n\n____________________________________")
     print(f"Event {ev_no} Run {run_no}")
     print(f"\nPWF Values and uncertainties:\n Zenith: {np.rad2deg(t_recons.zenith_pwf)} ± {np.rad2deg(t_recons.crb_zenith_pwf)} deg\n Azimuth: {np.rad2deg(t_recons.azimuth_pwf)} ± {np.rad2deg(t_recons.crb_azimuth_pwf)} deg")
