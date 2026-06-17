@@ -7,7 +7,7 @@ import grand.analysis.fitting.plane_wave  as pwf
 
 def CRB_ADF_SWF(theta_swf: float, phi_swf: float, r_xsource: float, t_s: float, theta_adf: float, phi_adf: float, delta_omega: float, scaling_factor: float, Xants: np.ndarray, uncertainties: tuple) -> np.ndarray:
     """
-    Cramer-Rao Bound (CRB) calculation for the Plane Wave Fit (PWF) model.
+    Cramer-Rao Bound (CRB) calculation for the Spherical Wave Fit (SWF) and Angular Distribution Function (ADF) model.
 
     Parameters
     ----------
@@ -108,6 +108,73 @@ def CRB_ADF_SWF(theta_swf: float, phi_swf: float, r_xsource: float, t_s: float, 
         print("Fisher Information Matrix is singular, cannot compute CRB on ADF and SWF.")
         return np.full(8, np.nan)
     
+def CRB_SWF(theta_swf: float, phi_swf: float, r_xsource: float, t_s: float, Xants: np.ndarray, uncertainties: tuple) -> np.ndarray:
+    """
+    Cramer-Rao Bound (CRB) calculation for the Spherical Wave Fit (SWF) model.
+
+    Parameters
+    ----------
+    theta_swf : float
+        Azimuth angle from SWF reconstruction (radians).
+    phi_swf : float
+        Azimuth angle from SWF reconstruction (radians).
+    r_xsource : float
+        Distance to the source (meters).
+    t_s : float
+        Emission time of the source (seconds).
+    Xants : np.ndarray
+        Antenna positions, shape (N, 3).
+    uncertainty_amplitude : float, optional
+        Relative uncertainty in amplitude measurements (current 7.5%).
+    uncertainty_time : float, optional
+        Uncertainty in time measurements (seconds).
+
+    Returns
+    -------
+    np.ndarray
+        The computed Cramer-Rao Bound value for the ADF SWF model.
+    """
+    # Number of antennas
+    nants = Xants.shape[0]
+    params = [theta_swf, phi_swf, r_xsource, t_s]
+    sigma_time, _, _ = uncertainties
+    
+    # Allocate memory for Fisher Information Matrix
+    fisher_information_matrix = np.zeros((4, 4))
+    derivates_time = np.zeros((Xants.shape[0], 4))
+
+    # Parameters array, and step sizes for numerical derivatives
+    params = np.hstack([params])
+    h = 1e-6 * np.abs(params) ; h[3] = 1e-9  # bigger step for time to avoid numerical issues
+
+    # Derivate on each antenna for each parameter
+    for i in range(4):
+        params_plus  = params.copy() ; params_plus[i]  += h[i]
+        params_minus = params.copy() ; params_minus[i] -= h[i]
+
+        # Derivate over time
+        pred_time_plus = swf.SWF_model(params_plus[0], params_plus[1], params_plus[2], params_plus[3], Xants)
+        pred_time_minus = swf.SWF_model(params_minus[0], params_minus[1], params_minus[2], params_minus[3], Xants)
+
+        derivates_time[:, i] = (pred_time_plus - pred_time_minus) / (2.0 * h[i])
+
+    # Fill Fisher Information Matrix
+    for i in range(nants):
+        fisher_information_matrix += np.outer(derivates_time[i, :], derivates_time[i, :]) / (sigma_time ** 2)
+    
+    # Try to compute the Cramer-Rao Bound values from the inverse of the Fisher Information Matrix
+    try:
+        cov_matrix = np.linalg.inv(fisher_information_matrix)
+        crb_values = np.sqrt(np.diag(cov_matrix))
+        if np.any(np.isnan(crb_values)):
+            print("Cramer-Rao Bound computation resulted in NaN values.")
+        if np.any(np.isinf(crb_values)):
+            print("Cramer-Rao Bound computation resulted in Inf values.")
+        return crb_values
+    except np.linalg.LinAlgError:
+        print("Fisher Information Matrix is singular, cannot compute CRB on ADF and SWF.")
+        return np.full(4, np.nan)
+
 def CRB_PWF(theta_pwf: float, phi_pwf: float, Xants: np.ndarray, uncertainties:tuple) -> np.ndarray:
     """
     Cramer-Rao Bound (CRB) calculation for the Plane Wave Fit (PWF) model.
@@ -123,11 +190,11 @@ def CRB_PWF(theta_pwf: float, phi_pwf: float, Xants: np.ndarray, uncertainties:t
     uncertainties : tuple
         A tuple containing the following uncertainties:
         - uncertainty_time: float
-            The time uncertainty (in seconds).
+            The time uncertainty (in seconds) = GPS jitter + sampling time step.
         - uncertainty_background: float
             The background noise uncertainty (in ADC counts or µV/m).
         - uncertainty_amplitude: float
-            The amplitude uncertainty (relative).
+            The amplitude uncertainty (relative) for antennas.
 
     Returns
     -------
