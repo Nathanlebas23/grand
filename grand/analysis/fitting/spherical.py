@@ -2,8 +2,11 @@ import numpy as np
 import grand.analysis.physics as phy
 import grand.analysis.constants as cons
 from scipy.optimize import differential_evolution
+from numba import njit
 
+kwd = {"fastmath": {"reassoc", "contract", "arcp"}}
 
+@njit(**kwd)
 def SWF_loss(theta, phi, r_xmax, t_s, Xants, tants, sigma = None, cr=cons.c_light):
 
     '''
@@ -109,28 +112,16 @@ def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=1000, seed=
     
     
     # Run the minimization
-    if sigma is None: 
-        result = differential_evolution(
-        lambda p: SWF_loss(p[0], p[1], p[2], p[3], Xants, tants),
+    result = differential_evolution(
+        lambda p: SWF_loss(p[0], p[1], p[2], p[3], Xants, tants, sigma),
         bounds=bounds,
         maxiter=maxiter,
         tol=1e-6,
         mutation=(0.5, 1),
         recombination=0.7,
         seed=seed
+        # disp=True
     )
-
-    else:
-        result = differential_evolution(
-            lambda p: SWF_loss(p[0], p[1], p[2], p[3], Xants, tants),
-            bounds=bounds,
-            maxiter=maxiter,
-            tol=1e-6,
-            mutation=(0.5, 1),
-            recombination=0.7,
-            seed=seed        
-    )
-
     # Extract best-fit parameters
     theta_swf, phi_swf, r_xmax_swf, t_s_swf = result.x
     

@@ -105,6 +105,7 @@ def get_peak_time_adc(trace, nutrig_template, t0, dt_ns=2):
     float or np.ndarray
         Time of the peak amplitude in seconds.
     """
+    trace = trace[np.argmax(np.max(trace, axis=1))] 
     convolution = convolve(trace, nutrig_template, mode='same')
     convolution_hilbert = np.abs(hilbert(convolution))
     peak_idx = np.argmax(convolution_hilbert)

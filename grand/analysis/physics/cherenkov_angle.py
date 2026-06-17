@@ -1,7 +1,10 @@
 import numpy as np
 import grand.analysis.physics as atm
+from numba import njit
 
+kwd = {"fastmath": {"reassoc", "contract", "arcp"}}
 
+@njit(**kwd)
 def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
 
     """
@@ -32,7 +35,7 @@ def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
 
     # Direction vector to observer's position from shower core
     # This is a bit dangerous for antennas numerically close to shower core... 
-    U = dXcore / np.linalg.norm(dXcore)
+    U = dXcore / np.maximum(np.linalg.norm(dXcore), 1e-6)
     # Compute angle between shower direction and (horizontal) direction to observer
     alpha = np.arccos(np.dot(K,U))
     alpha = np.pi-alpha
@@ -48,6 +51,7 @@ def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
     # omega_cr = omega_cr_guess
     return(omega_cr)
 
+@njit(**kwd)
 def compute_delay(omega,Xmax, Xa, Xb,Xant,U,K,alpha,delta,xmaxDist):
     """
     Compute residual time delay for a given Cherenkov angle guess.
@@ -77,6 +81,7 @@ def compute_delay(omega,Xmax, Xa, Xb,Xant,U,K,alpha,delta,xmaxDist):
     # print('delay = ',res)
     return(res)
 
+@njit(**kwd)
 def minor_equation(omega, n2, n1, alpha, delta, xmaxDist):
 
     '''
@@ -84,7 +89,7 @@ def minor_equation(omega, n2, n1, alpha, delta, xmaxDist):
     Compute [c*delta(t)]^2    
     '''
     sa = np.sin(alpha)
-    saw = np.sin(alpha+omega)
+    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-6 else 1e-6 # Avoid division by zero for horizontal showers
     com = np.cos(omega)
     l0 = xmaxDist*sa/saw
     l1 = np.sqrt(l0**2+delta**2+2*delta*l0*com)
@@ -93,6 +98,7 @@ def minor_equation(omega, n2, n1, alpha, delta, xmaxDist):
     res = (n2*l2+2*delta)**2-(n1*l1)**2
     return(res)
 
+@njit(**kwd)
 def compute_observer_position(omega,Xmax,Xant,U,K,xmaxDist,alpha):
     """
     Compute observer (antenna) position given Cherenkov angle.
@@ -126,10 +132,12 @@ def compute_observer_position(omega,Xmax,Xant,U,K,xmaxDist,alpha):
     # this assumed coincidence was computed at antenna altitude)
     #t = (Xant[2] - Xmax[2])/Dir_obs[2]
     # This assumes coincidence is computed at fixed alpha, i.e. along U, starting from Xcore
-    t = np.sin(alpha)/np.sin(alpha+omega) * xmaxDist
+    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-6 else 1e-6 # Avoid division by zero for horizontal showers
+    t = np.sin(alpha)/saw * xmaxDist
     X = Xmax + t*Dir_obs
     return (X)
 
+@njit(**kwd)
 def rotation(angle,axis):
     """
     Compute 3x3 rotation matrix around axis using Rodrigues formula.
@@ -148,12 +156,14 @@ def rotation(angle,axis):
     mat = np.eye(3) + sa*cross + (1.0-ca)*np.dot(cross,cross)
     return (mat)
 
+@njit(**kwd)
 def der(func,x,args=[], eps=1e-7):
     '''
     Forward estimate of derivative
     '''
     return ((func(x+eps,*args)-func(x,*args))/eps)
 
+@njit(**kwd)
 def newton(func,x0,tol=1e-7,nstep_max = 100, args = [], verbose=False):
     """
     Newton-Raphson zero-finding method with numerical derivative.
@@ -169,15 +179,19 @@ def newton(func,x0,tol=1e-7,nstep_max = 100, args = [], verbose=False):
     Returns:
     - x : float -> estimated zero of func
     """
-    rel_error = np.infty
+    rel_error = np.inf
     xold = x0
     nstep = 0
     while ((rel_error > tol) and (nstep<nstep_max)):
-        x = xold - func(xold,*args)/der(func,xold,args=args)
+        derivative = der(func,xold,args=args) if np.abs(der(func,xold,args=args)) > 1e-12 else 1e-12  # Avoid division by zero
+        x = xold - func(xold,*args)/derivative
         nstep += 1
         if verbose==True:
             print ("x at iteration",nstep, 'is ',x)
-        rel_error = np.abs((x-xold)/xold)
+        if np.abs(xold) > 1e-12:
+            rel_error = np.abs((x-xold)/xold)
+        else:
+            rel_error = np.abs(x-xold)
         xold = x
 #    if (nstep == nstep_max):
 #        print ("Convergence not achieved in %d iterations"%nstep_max)
