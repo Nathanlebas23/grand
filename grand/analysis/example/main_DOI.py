@@ -6,6 +6,7 @@ import grand.analysis.signals as sig
 import grand.analysis.fitting as fit
 import grand.analysis.constants as cons
 import grand.analysis.energy_reco as en
+import grand.analysis.cramer_rao_bounds as crb
 import grand.analysis.coords.array_shower as co
 import grand.analysis.geom as geom
 from grand.dataio import TShower, TRawVoltage
@@ -55,11 +56,13 @@ def read_event_list(txt_file, start_line, stop_line='None'):
 # ---------------------------------------------------------------
 # Load RTK antenna positions from text file
 # Convert antenna IDs to int, store x (East), y (North), z (sea level)
+# Get the uncertainties from file name to use in CRB calculations
 # ---------------------------------------------------------------
 file_path = conf.antenna_file
 column_names = ['antenna_ID', 'x', 'y', 'z'] #'x' is East, 'y' is North, 'z' DAQ level (1231m) 
 antenna_position = pd.read_csv(file_path, sep=r'\s+', names=column_names, header=None)
 antenna_position['antenna_ID'] = antenna_position['antenna_ID'].astype(int) 
+uncertainties = crb.uncertainties_from_file_name(file_path)
 
 # ---------------------------------------------------------------
 # Initialize TShower object to store reconstructed events
@@ -152,13 +155,14 @@ for rootfile, ev_idx in read_event_list(flagged_txt, start_line=5, stop_line=15)
     # Store PWF results
     trecons.zenith_pwf = theta_pwf_rad
     trecons.azimuth_pwf = phi_pwf_rad
-    trecons.chi2_pwf = chi2_pwf
+    trecons.chi2_pwf = chi2_pwf_reduced
 
     # ---------------------------------------------------------------
     # CRB calculation for PWF
     # ---------------------------------------------------------------
     stds_pwf = crb.CRB_PWF(
-        theta_pwf_rad, phi_pwf_rad, Xants
+        theta_pwf_rad, phi_pwf_rad, 
+        Xants, uncertainties
     )
 
     trecons.crb_zenith_pwf = stds_pwf[0]
@@ -206,7 +210,7 @@ for rootfile, ev_idx in read_event_list(flagged_txt, start_line=5, stop_line=15)
     stds = crb.CRB_ADF_SWF(
         theta_swf_rad, phi_swf_rad, r_xmax, t_s,
         theta_adf, phi_adf, delta_omega, scaling_factor,
-        Xants
+        Xants, uncertainties
     )
 
     # Store ADF, energy results and CRB in TRecons
