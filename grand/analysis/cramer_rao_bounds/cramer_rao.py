@@ -275,11 +275,11 @@ def uncertainties_from_file_name(file_name: str) -> tuple:
             background_noise = 0.0
             amplitude_uncertainty = 0.0
         elif is_an_adc:
-            jitter_time = 10e-9
+            jitter_time = 5e-9
             background_noise = 15.0
             amplitude_uncertainty = 0.075
         else:
-            jitter_time = 10e-9
+            jitter_time = 5e-9
             background_noise = 4.0
             amplitude_uncertainty = 0.075
 
@@ -290,20 +290,24 @@ def uncertainties_from_file_name(file_name: str) -> tuple:
             background_noise = 0.0
             amplitude_uncertainty = 0.0
         elif is_an_adc:
-            jitter_time = 10e-9
+            jitter_time = 5e-9
             background_noise = 12.0
             amplitude_uncertainty = 0.075
         else:
-            jitter_time = 10e-9
+            jitter_time = 5e-9
             background_noise = 5.0
             amplitude_uncertainty = 0.075
 
     else:  # CoREAS
         min_amplitude = 1.0 # 1 ADC count, minimal increment of values
         if is_an_adc:
-            jitter_time = 10e-9
+            jitter_time = 5e-9
             background_noise = 10.0
             amplitude_uncertainty = 0.075
+        else:
+            jitter_time = 0.0
+            background_noise = 0.0
+            amplitude_uncertainty = 0.0
     
     sigma_time = np.sqrt(jitter_time**2 + jitter_time_min**2)
     background_noise = np.sqrt(background_noise**2 + min_amplitude**2)
