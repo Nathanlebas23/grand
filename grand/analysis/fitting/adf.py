@@ -33,10 +33,9 @@ def ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAlt
     """
 
     K = co.shower_direction_vector(theta, phi)
-    K[2] = np.maximum(K[2], 1e-6)  # Avoid division by zero for horizontal showers
    
-    asym_coeff = -0.003*np.rad2deg(theta)+0.220
-    asym_div = np.maximum(np.sqrt(1. - np.dot(K,Bvec)**2), 1e-6)  # Avoid division by zero
+    asym_coeff = -0.003*np.rad2deg(theta)+0.220 # only for theta in [57°, 87°]
+    asym_div = np.sqrt(1. - np.dot(K,Bvec)**2)
     asym = asym_coeff/asym_div
 
     l_ant = an.distance_source_antenna(Xants, Xsource)
