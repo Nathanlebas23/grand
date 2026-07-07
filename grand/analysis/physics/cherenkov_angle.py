@@ -95,7 +95,7 @@ def minor_equation(omega, n2, n1, alpha, delta, xmaxDist):
     Compute [c*delta(t)]^2    
     '''
     sa = np.sin(alpha)
-    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-6 else 1e-6 # Avoid division by zero for horizontal showers
+    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-10 else 1e-10 # Avoid division by zero for horizontal showers
     com = np.cos(omega)
     l0 = xmaxDist*sa/saw
     l1 = np.sqrt(l0**2+delta**2+2*delta*l0*com)
@@ -138,7 +138,7 @@ def compute_observer_position(omega,Xmax,Xant,U,K,xmaxDist,alpha):
     # this assumed coincidence was computed at antenna altitude)
     #t = (Xant[2] - Xmax[2])/Dir_obs[2]
     # This assumes coincidence is computed at fixed alpha, i.e. along U, starting from Xcore
-    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-6 else 1e-6 # Avoid division by zero for horizontal showers
+    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-10 else 1e-10 # Avoid division by zero for horizontal showers
     t = np.sin(alpha)/saw * xmaxDist
     X = Xmax + t*Dir_obs
     return (X)
