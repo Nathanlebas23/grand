@@ -65,10 +65,10 @@ def SWF_loss(theta, phi, r_xmax, t_s, Xants, tants, sigma = None, cr=cons.c_ligh
         sigma = cr*sigma
     if sigma == None:
         return chi2
-    return(chi2/(sigma**2))
+    return(chi2/ (sigma**2)) # chi^2 normalized by sigma^2 and degrees of freedom (N-4)
 
 
-def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=1000, seed=42):
+def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=42):
     """
     Perform a SWF reconstruction using differential evolution minimization.
 
@@ -119,7 +119,8 @@ def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=1000, seed=
         tol=1e-6,
         mutation=(0.5, 1),
         recombination=0.7,
-        seed=seed
+        seed=seed,
+        x0 = np.array(bounds, dtype=np.float64).mean(axis=1)
         # disp=True
     )
     # Extract best-fit parameters
