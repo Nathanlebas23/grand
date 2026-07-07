@@ -26,16 +26,22 @@ def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
     # Compute coordinates of point after Xmax
     Xa = Xsource + delta*K
 
-    #dXcore = Xant - np.array([0.,0.,groundAltitude])
-    # Core of shower, taken at groundAltitude for reference
-    # Ground altitude might be computed later as a derived quantity, e.g. 
-    # as the median of antenna altitudes.
-    Xcore = Xsource + xsourceDist * K 
+    # Compute core position at ground altitude
+    theta = np.arccos(-K[2])
+    phi = np.arctan2(-K[1], -K[0])
+    z_core = Xant[2]
+    y_core = np.sin(theta)*np.sin(phi)*(z_core-Xsource[2])/(-np.cos(theta)) + Xsource[1]
+    x_core = np.sin(theta)*np.cos(phi)*(z_core-Xsource[2])/(-np.cos(theta)) + Xsource[0]
+    Xcore = np.empty(3, dtype=np.float64)
+    Xcore[0] = x_core
+    Xcore[1] = y_core
+    Xcore[2] = z_core
+
     dXcore = Xant - Xcore
 
     # Direction vector to observer's position from shower core
     # This is a bit dangerous for antennas numerically close to shower core... 
-    U = dXcore / np.maximum(np.linalg.norm(dXcore), 1e-6)
+    U = dXcore / np.maximum(np.linalg.norm(dXcore), 1e-10)
     # Compute angle between shower direction and (horizontal) direction to observer
     alpha = np.arccos(np.dot(K,U))
     alpha = np.pi-alpha
