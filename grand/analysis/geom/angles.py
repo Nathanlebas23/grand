@@ -1,7 +1,11 @@
 import grand.analysis.coords.array_shower as co
 import numpy as np
 import grand.analysis.constants as cons
+from numba import njit
 
+kwd = {"fastmath": {"reassoc", "contract", "arcp"}}
+
+@njit(**kwd)
 def eta(theta, phi, Bvec, Xants, Xsource):
     """
     Computes the angle eta (azimuth angle in the shower plane).
@@ -18,6 +22,7 @@ def eta(theta, phi, Bvec, Xants, Xsource):
     else:
         return np.arctan2(dX_sp[:,1], dX_sp[:,0])
 
+@njit(**kwd)
 def distance_source_antenna(Xants,Xsource):
     """
     Computes the distance(s) between source and antenna(s).
@@ -27,11 +32,11 @@ def distance_source_antenna(Xants,Xsource):
     """
     dX = Xants - Xsource 
     if dX.ndim == 1:
-        return np.linalg.norm(dX)
+        return np.array(np.linalg.norm(dX)).reshape(1,)
     else:
-        return np.linalg.norm(dX, axis=1)
+        return np.sqrt(np.sum(dX**2, axis=1))
     
-
+@njit(**kwd)
 def omega(theta, phi, Xants, Xsource):
     """
     Computes the angle omega between shower direction and antenna vector(s).
@@ -47,10 +52,11 @@ def omega(theta, phi, Xants, Xsource):
     if dX.ndim == 1:
         cos_omega = np.dot(K, dX) / l_ant   
     else:
-        cos_omega = np.einsum('i,ni->n', K, dX) / l_ant 
+        cos_omega = np.sum(K * dX, axis=1) / l_ant
 
     return np.arccos(cos_omega)  
 
+@njit(**kwd)
 def sin_geomag_angle(theta, phi, B=cons.Bn):
     """
     Computes the sine of the geomagnetic angle (alpha) between the shower axis

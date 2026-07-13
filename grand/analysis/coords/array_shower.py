@@ -1,5 +1,9 @@
 import numpy as np
+from numba import njit
 
+kwd = {"fastmath": {"reassoc", "contract", "arcp"}}
+
+@njit(**kwd)
 def shower_direction_vector(theta, phi):
     """
     Returns the shower direction vector K (orientation of the shower front).
@@ -24,6 +28,7 @@ def shower_direction_vector(theta, phi):
 
     return K
 
+@njit(**kwd)
 def transformation_matrix(theta, phi, Bvec):
     """
     Builds the rotation matrix to the shower frame.
@@ -45,6 +50,7 @@ def transformation_matrix(theta, phi, Bvec):
 
     return M
 
+@njit(**kwd)
 def to_shower_frame(theta, phi, Bvec, Xant, Xsource):
     """
     Transforms global coordinates -> shower frame.

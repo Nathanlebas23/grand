@@ -6,7 +6,11 @@ import grand.analysis.geom.angles as an
 import sys
 #print(sys.path)
 from iminuit import minimize
+from numba import njit
 
+kwd = {"fastmath": {"reassoc", "contract", "arcp"}}
+
+@njit(**kwd)
 def ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAltitude=cons.groundAltitude, Bvec=cons.Bvec):
     """
     Compute all geometric parameters for the ADF function.
@@ -30,9 +34,9 @@ def ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAlt
 
     K = co.shower_direction_vector(theta, phi)
    
-    asym_coeff = -0.003*np.rad2deg(theta)+0.220
-    asym = asym_coeff/np.sqrt(1. - np.dot(K,Bvec)**2)
-    
+    asym_coeff = -0.003*np.rad2deg(theta)+0.220 # only for theta in [57°, 87°]
+    asym_div = np.sqrt(1. - np.dot(K,Bvec)**2)
+    asym = asym_coeff/asym_div
 
     l_ant = an.distance_source_antenna(Xants, Xsource)
     eta = an.eta(theta, phi, Bvec, Xants, Xsource)
@@ -44,12 +48,12 @@ def ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAlt
     # limit for small theta
     if theta <70*np.pi/180: 
             omega_cr = np.minimum(omega_cr, 0.6*np.pi/180)
-    
     adf = amplitude/l_ant / (1.+4.*( ((np.tan(omega)/np.tan(omega_cr))**2 - 1. )/delta_omega)**2)
     adf *= 1. + asym*np.cos(eta) # 
     
     return eta, omega, omega_cr, l_ant, adf
 
+@njit(**kwd)
 def ADF_loss(params, Aants, Xants, Xsource, uncertainty=0.075):
     """
     Compute chi² for the ADF function.
@@ -70,8 +74,9 @@ def ADF_loss(params, Aants, Xants, Xsource, uncertainty=0.075):
 
     # Compute model
     _, _, _, _, amplitude_model = ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAltitude=cons.groundAltitude, Bvec=cons.Bvec)
+    uncertainties = np.maximum(uncertainty * Aants, 1)  # Avoid division by zero
     
-    chi2 = np.sum((Aants - amplitude_model)**2 / (uncertainty*Aants)**2)
+    chi2 = np.sum(((Aants - amplitude_model) / uncertainties)**2)
     return chi2
 
 
@@ -124,6 +129,7 @@ def recons_ADF(theta_pwf, phi_pwf, Aants, Xants, Xsource):
     theta_adf, phi_adf, delta_omega, amplitude = result.x
     return theta_adf, phi_adf, delta_omega, amplitude
 
+@njit(**kwd)
 def ADF_fun(l_ant, amplitude, omega_cr, delta_omega):
     """
     Compute a simple model of the ADF for a shower on all omega values.
