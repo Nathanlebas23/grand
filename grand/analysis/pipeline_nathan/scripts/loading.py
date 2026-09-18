@@ -13,18 +13,11 @@ import numpy as np
 import pandas as pd
 import yaml
 
-# from grand.aoi import EventList, Shower
-# from grand.dataio import TRecons
-# import grand.analysis.signals.extraction as ext
-# import grand.analysis.fitting as fit
-# import grand.analysis.constants as cons
-# import grand.analysis.geom as geom
-# import grand.analysis.energy_reco as en
-# from setup_logger import setup_logger
-
 logger = logging.getLogger("grand.process")
 
-
+#----------------------------------------------
+# Loading functions for pipeline
+#----------------------------------------------
 
 def load_config(config_path: Path) -> dict:
     """Load the pipeline configuration from a YAML file."""
@@ -49,3 +42,23 @@ def load_nutrig_template(template_path: str) -> np.ndarray:
     templates = np.loadtxt(template_path, comments="#")
     template = templates[0]
     return template
+
+
+def get_trecons_path(paths_cfg, file_number: int) -> tuple[Path, Path]:
+    input_dir = Path(paths_cfg["input_dir"])
+    rootfiles = sorted(input_dir.glob("*.root"), key=natural_sort_key)
+    if not rootfiles:
+        raise RuntimeError(f"No ROOT files found in {input_dir}")
+    if file_number < 0 or file_number >= len(rootfiles):
+        raise IndexError(
+            f"ROOT file number {file_number} is out of range. "
+            f"Found {len(rootfiles)} ROOT files."
+        )
+    rootfile_path = rootfiles[file_number]
+    output_dir = Path(paths_cfg["output_dir"]) / rootfile_path.stem
+    trecons_path = output_dir / f"{rootfile_path.stem}_trecons.root"
+    if not trecons_path.is_file():
+        raise FileNotFoundError(
+            f"{trecons_path} not found - run scripts/main.py {file_number} first."
+        )
+    return trecons_path, rootfile_path

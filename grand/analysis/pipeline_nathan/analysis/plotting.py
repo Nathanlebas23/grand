@@ -1,6 +1,8 @@
 import sys
 sys.path.append("/home/lpnhe/grand")
 
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -58,3 +60,52 @@ def plot_footprint(t_recons, antenna_position, Xants, K, Xcore, x_ell, omega_cr_
     plt.subplots_adjust(left=0.15)
     plt.savefig(f"{plot_dir}/footprint_event_{t_recons.event_number}_run_{t_recons.run_number}.png")
 
+
+def plot_timing_residuals(t_recons, timing: dict, plot_dir) -> None:
+    """Plot measured-vs-model peak times and residuals for PWF and SWF, one figure per event."""
+    fig, axs = plt.subplots(2, 2, figsize=(11, 9))
+
+    for ax, t_model_ns, chi2r, label in (
+        (axs[0, 0], timing["t_pwf_ns"], timing["chi2_pwf_reduced"], "PWF"),
+        (axs[0, 1], timing["t_swf_ns"], timing["chi2_swf_reduced"], "SWF"),
+    ):
+        ax.scatter(timing["t_exp_ns"], t_model_ns)
+        for i, idx in enumerate(timing["antenna_index"]):
+            ax.annotate(str(idx), (timing["t_exp_ns"][i], t_model_ns[i]), fontsize=7)
+        vmin = min(timing["t_exp_ns"].min(), t_model_ns.min())
+        vmax = max(timing["t_exp_ns"].max(), t_model_ns.max())
+        ax.plot([vmin, vmax], [vmin, vmax], "--", color="gray")
+        ax.set_xlabel("t_exp [ns]")
+        ax.set_ylabel("t_rec [ns]")
+        ax.set_title(f"{label}  chi2/ndf = {chi2r:.2f}")
+
+    sigma_t_ns = timing["sigma_t_ns"]
+    for ax, resid_ns, label in (
+        (axs[1, 0], timing["resid_pwf_ns"], "PWF"),
+        (axs[1, 1], timing["resid_swf_ns"], "SWF"),
+    ):
+        ax.scatter(timing["t_exp_ns"], resid_ns)
+        ax.axhline(0, linestyle="--", color="gray")
+        ax.axhline(sigma_t_ns, linestyle=":", color="gray", label=f"+-{sigma_t_ns:.0f} ns")
+        ax.axhline(-sigma_t_ns, linestyle=":", color="gray")
+        ax.set_xlabel("t_exp [ns]")
+        ax.set_ylabel("t_exp - t_rec [ns]")
+        ax.set_title(f"{label} residuals")
+        ax.legend(fontsize=8)
+
+    fig.suptitle(f"Event {t_recons.event_number} - Run {t_recons.run_number}")
+    fig.tight_layout()
+    fig.savefig(Path(plot_dir) / f"timing_residuals_event_{t_recons.event_number}_run_{t_recons.run_number}.png")
+    plt.close(fig)
+
+
+def plot_event(t_recons, results: dict, antenna_position, plot_dir) -> None:
+    """Produce the ADC-vs-omega and footprint plots for one already-analyzed event."""
+    plot_ADC_vs_omega(
+        t_recons, results["omega_cr_mean"], results["w"], results["adf_f"],
+        results["fsuptit"], results["ftit_adf"], plot_dir,
+    )
+    plot_footprint(
+        t_recons, antenna_position, results["Xants"], results["K"], results["Xcore"],
+        results["x_ell"], results["omega_cr_mean"], results["fsuptit"], results["ftit_adf"], plot_dir,
+    )
