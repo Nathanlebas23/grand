@@ -1,0 +1,9 @@
+paths:
+  input_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/mock_inputs/gp80/GrandRoot/2026/09"
+  output_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/outputs"
+  rtk_antenna_positions_path: "/home/lpnhe/grand/grand/analysis/example/RTK_pos/rtk_pos_gp65_from_xls_gdl.csv"
+  nutrig_template_path: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/templates_ZHAireS_DC2.1rc4_RAW_XY_THRESH_100_5.txt"
+
+logging:
+  level: "INFO"
+  log_file: null
