@@ -1,13 +1,22 @@
 import sys
-sys.path.append("/home/lpnhe/grand")
-
 import numpy as np
 import logging
+from pathlib import Path
 
 from grand.dataio import TRecons
 from grand.analysis.coords import array_shower as co
 from grand.analysis import geom, fitting as fit
 import grand.analysis.constants as cons
+
+#-------------------------------
+# Load GRANDlib
+#-------------------------------
+from grand.analysis.pipeline_nathan.scripts.loading import load_config
+
+config_path = Path(__file__).parent.parent / "config.yaml"
+config = load_config(config_path)
+
+sys.path.append(config['paths']['grandlib_path'])
 
 logger = logging.getLogger("grand.process")
 

@@ -1020,6 +1020,17 @@ class TRecons(MotherEventTree):
     ## Number of triggered antennas
     du_count: TTreeScalarDesc = field(default=TTreeScalarDesc(np.uint32))
 
+    ## NUTRIG FLT correlation coefficient on channel X (per antenna)
+    rho_x: StdVectorListDesc = field(default=StdVectorListDesc("float"))
+    ## NUTRIG FLT correlation coefficient on channel Y (per antenna)
+    rho_y: StdVectorListDesc = field(default=StdVectorListDesc("float"))
+    ## max(rho_x, rho_y) per antenna
+    rho_max: StdVectorListDesc = field(default=StdVectorListDesc("float"))
+    ## Event-level min of rho_max over antennas (NUTRIG cut score)
+    rho_min: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+    ## Event-level mean of rho_max over antennas (NUTRIG cut score)
+    rho_mean: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+
     # Plane Wave Fits (PWF) reconstruction outputs 
     ## Shower zenith angle from PWF (in radians)
     ## Coordinate system: NWU, origin at layout center, "coming from"

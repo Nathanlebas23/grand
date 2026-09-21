@@ -2,18 +2,9 @@
 File to reconstuct events from the raw data. It uses the configuration file to get the paths and parameters for the reconstruction.
 """
 import sys  
-sys.path.append("/home/lpnhe/grand")
-
-import argparse
 import logging
-import re
-from datetime import datetime
 from pathlib import Path
-
 import numpy as np
-import pandas as pd
-import yaml
-
 from grand.aoi import Shower
 from grand.dataio import TRecons
 import grand.analysis.signals.extraction as ext
@@ -22,30 +13,30 @@ import grand.analysis.constants as cons
 import grand.analysis.geom as geom
 import grand.analysis.energy_reco as en
 
+#-------------------------------
+# Load configuration
+#-------------------------------
+from grand.analysis.pipeline_nathan.scripts.loading import load_config
+
+config_path = Path(__file__).parent.parent / "config.yaml"
+config = load_config(config_path)
+
+sys.path.append(config['paths']['grandlib_path'])
 
 logger = logging.getLogger("grand.process")
 
 
-def reconstruct_event(e, antenna_position, nutrig_template, trecons: TRecons, run_number) -> None:
+def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, ADC_traces) -> None:
     """Run the PWF/SWF/ADF/energy reconstruction chain for a single event.
 
     Fills the Shower fields on e.shower and prepares trecons's fields
     for this event. Does not call trecons.fill() or e.write() - the caller (process_file)
     does that, so a TRecons entry only exists once both reconstruction and writing succeed.
-    """
 
-    # -------------------------------
-    # Convert voltage traces to ADC counts
-    # At this stage, v.trace already contains only three components:
-    #   v.trace[0] -> X
-    #   v.trace[1] -> Y
-    #   v.trace[2] -> Z
-    # Therefore channels=[0,1,2] refers to X, Y, Z respectively
-    # --------------------------------
-    ADC_traces_list = []
-    for v in e.voltages: # Takes the voltage traces from the event and converts them to ADC counts
-        ADC_traces_list.append(ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]))
-    ADC_traces = np.array(ADC_traces_list)
+    ADC_traces (shape (n_antennas, 3, n_samples), same order as e.voltages) is computed
+    once by compute_nutrig_event() and reused here - this function does not know about
+    NUTRIG/rho at all, it stays scoped to the physical reconstruction (peaks/PWF/SWF/ADF/energy).
+    """
     n_antennas = len(e.voltages)
 
     # ---------------------------------------------------------------
@@ -54,12 +45,21 @@ def reconstruct_event(e, antenna_position, nutrig_template, trecons: TRecons, ru
     peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[0, 1, 2])
                           for i in range(n_antennas)])
 
-    t0_all = np.array([v.t0.astype('int64') for v in e.voltages])
-    logger.debug(f"t0_all: {t0_all}, t0_all.min(): {t0_all.min()}")
-    t0 = t0_all - t0_all.min() 
+    t0 = ext.compute_t0(e.tvoltage)  # t0 in ns
+    logger.debug(f"Event {e.event_number} (run {run_number}): t0 = {t0}")
 
-    peak_times = np.array([ext.get_peak_time_adc(ADC_traces[i], nutrig_template, t0[i])
+    # To investigate if the time here is consistent with the method used in the extraction module,
+    # we can compute t0 using the compute_t0 function from the extraction module and compare 
+    # it with the t0 computed above.
+    # t0_method = ext.compute_t0(e.t0.astype('int64'))
+    # logger.debug(f"t0_method (from compute_t0): {t0_method}, t0_method - t0_all.min(): {t0_method - t0_all.min()}")
+
+    # On ADC
+    peak_times = np.array([ext.get_peak_time_efield(ADC_traces[i], t0[i], channels=[0,1,2])
                            for i in range(n_antennas)])
+    
+    # peak_times = np.array([ext.get_peak_time_adc(ADC_traces[i], nutrig_template, t0[i])
+    #                        for i in range(n_antennas)])
 
     # ----------------------------------------------------------------
     # Map DU IDs to their positions (X, Y, Z) in GRAND reference frame
@@ -131,8 +131,8 @@ def reconstruct_event(e, antenna_position, nutrig_template, trecons: TRecons, ru
     trecons.run_number = run_number
     trecons.event_number = e.event_number
 
-    trecons.peak_amps = peak_amps
-    trecons.peak_time = peak_times
+    trecons.peak_amps = peak_amps # ADC
+    trecons.peak_time = peak_times 
     trecons.Xants = Xants
     trecons.du_count = n_antennas
 

@@ -1,12 +1,16 @@
 import sys  
-sys.path.append("/home/lpnhe/grand")
+from pathlib import Path
+
+# GRAND repository root
+GRAND_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(GRAND_ROOT))
 
 import argparse
 import logging
-from pathlib import Path
 from setup_logger import setup_logger
 from loading import load_config, load_antenna_positions, load_nutrig_template, natural_sort_key
 from process_file import process_file
+from cuts.compute_nutrig import is_flt_available
 
 logger = logging.getLogger("grand.process")
 
@@ -34,8 +38,7 @@ def main():
     )
     parser.add_argument(
         "--do-plot",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Whether to generate plots for each event (default: False).",
     )
 
@@ -58,6 +61,13 @@ def main():
     n_ant_cut = cuts_cfg["nant_cut"]["threshold"]
     logger.info(f"Antenna multiplicity cut: n_antennas >= {n_ant_cut}")
 
+    nutrig_cut_cfg = cuts_cfg["nutrig_cut"]
+    rho_min_threshold = nutrig_cut_cfg["rho_min_threshold"]
+    rho_mean_threshold = nutrig_cut_cfg["rho_mean_threshold"]
+    logger.info(
+        f"NUTRIG cut: rho_min >= {rho_min_threshold}, rho_mean >= {rho_mean_threshold}"
+    )
+
     paths_cfg = config["paths"]
 
     input_dir = Path(paths_cfg["input_dir"])
@@ -71,6 +81,24 @@ def main():
     template_path = Path(paths_cfg["nutrig_template_path"])
     if not template_path.is_file():
         raise FileNotFoundError(f"nutrig_template_path not found: {template_path}")
+
+    # Fail fast on global NUTRIG problems, before opening any ROOT file - a config/
+    # environment problem must stop the pipeline loudly, never degrade into a
+    # per-event NaN/cut (see compute_nutrig_event/passes_nutrig_cut).
+    nutrig_src_path = Path(paths_cfg["nutrig_src_path"])
+    if not nutrig_src_path.is_dir():
+        raise NotADirectoryError(f"nutrig_src_path does not exist or is not a directory: {nutrig_src_path}")
+
+    nutrig_templates_npz_path = Path(paths_cfg["nutrig_templates_npz_path"])
+    if not nutrig_templates_npz_path.is_file():
+        raise FileNotFoundError(f"nutrig_templates_npz_path not found: {nutrig_templates_npz_path}")
+
+    if not is_flt_available(nutrig_path=nutrig_src_path):
+        raise ImportError(
+            f"nutrig.flt package could not be imported from nutrig_src_path={nutrig_src_path}. "
+            "Check paths.nutrig_src_path in config.yaml."
+        )
+    logger.info(f"NUTRIG FLT package available (nutrig_src_path={nutrig_src_path})")
 
     logger.info(f"Input directory: {input_dir}")
     rootfiles = sorted(input_dir.glob("*.root"), key=natural_sort_key)
@@ -109,12 +137,23 @@ def main():
     logger.info("------------------------------------------------------------------------")
     logger.info(f"Processing ROOT file: {rootfile_path.stem}")
     logger.info("------------------------------------------------------------------------")
-    n_pass, n_cut, n_fail = process_file(rootfile_path, output_dir, antenna_position, nutrig_template, n_ant_cut=n_ant_cut, limit_events=args.limit_events, do_plot=args.do_plot)
-    
+    n_pass, n_cut_nant, n_cut_nutrig, n_fail = process_file(
+        rootfile_path,
+        output_dir,
+        antenna_position,
+        n_ant_cut=n_ant_cut,
+        nutrig_src_path=nutrig_src_path,
+        templates_npz_path=nutrig_templates_npz_path,
+        rho_min_threshold=rho_min_threshold,
+        rho_mean_threshold=rho_mean_threshold,
+        limit_events=args.limit_events,
+        do_plot=args.do_plot,
+    )
+
     logger.info(
         f"Done. file={rootfile_path.name}, "
-        f"events_total={n_pass + n_cut + n_fail}, "
-        f"passed={n_pass}, cut={n_cut}, failed={n_fail}"
+        f"events_total={n_pass + n_cut_nant + n_cut_nutrig + n_fail}, "
+        f"passed={n_pass}, cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, failed={n_fail}"
     )
 
 if __name__ == "__main__":

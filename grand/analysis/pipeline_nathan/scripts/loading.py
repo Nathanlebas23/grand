@@ -2,9 +2,6 @@
 Loading functions for the GRAND pipeline.
 This module contains functions to load configuration, antenna positions, and NUTRIG templates.
 """
-import sys  
-sys.path.append("/home/lpnhe/grand")
-
 import logging
 import re
 from pathlib import Path
@@ -18,6 +15,22 @@ logger = logging.getLogger("grand.process")
 #----------------------------------------------
 # Loading functions for pipeline
 #----------------------------------------------
+
+# #-------------------------------
+# # Load GRANDlib and nl_style
+# #-------------------------------
+# from grand.analysis.pipeline_nathan.scripts.loading import load_config
+
+# config_path = Path(__file__).parent.parent / "config.yaml"
+# config = load_config(config_path)
+
+# sys.path.append(config['paths']['grandlib_path'])
+# sys.path.append(config['paths']['nl_style_path'])
+
+# from nl_style import set_style , NL_COLORS
+
+# set_style()
+
 
 def load_config(config_path: Path) -> dict:
     """Load the pipeline configuration from a YAML file."""

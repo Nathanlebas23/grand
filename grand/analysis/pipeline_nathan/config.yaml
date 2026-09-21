@@ -5,7 +5,11 @@ paths:
   nutrig_template_path: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/templates_ZHAireS_DC2.1rc4_RAW_XY_THRESH_100_5.txt"
   plot_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/analysis/plots"
   sanity_plot_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/analysis/sanity_plots"
-  
+  grandlib_path: "/home/lpnhe/grand"
+  nl_style_path: "/home/lpnhe/Documents/Nutrig_analysis/runs/nl_style"
+  nutrig_src_path: "/home/lpnhe/nutrig/src"
+  nutrig_templates_npz_path: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/templates_ZHAireS_DC2.1rc4_RAW_XY_THRESH_100_5.npz"
+
 logging:
   level: "DEBUG"
   log_file: null
@@ -13,4 +17,11 @@ logging:
 cuts:
   nant_cut:
     threshold: 5
+  nutrig_cut:
+    # 0.5 is the historical per-channel/per-antenna rho threshold from the old
+    # ADF_efficiency reference (flt_rho_threshold / rho_cut) - reused here as a
+    # starting point for the new event-level rho_min/rho_mean cut, not an
+    # independently re-derived value. Tune against real data.
+    rho_min_threshold: 0.5
+    rho_mean_threshold: 0.5
 

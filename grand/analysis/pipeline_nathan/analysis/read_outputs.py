@@ -1,9 +1,11 @@
-import sys
-sys.path.append("/home/lpnhe/grand")
-
+import sys  
+from pathlib import Path
 import argparse
 import logging
-from pathlib import Path
+
+# GRAND repository root
+GRAND_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(GRAND_ROOT))
 
 from grand.dataio import TRecons
 from grand.analysis.pipeline_nathan.scripts.loading import load_config, load_antenna_positions, natural_sort_key, get_trecons_path
