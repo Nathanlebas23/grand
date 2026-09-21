@@ -64,6 +64,11 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
     )
     axs = axs[:, 0]
 
+    # Tracks whether each FLT-template legend entry has been added yet - anchored to
+    # the first antenna where that channel's overlay is actually drawn, rather than
+    # unconditionally i == 0 (whose own channel can be the one that failed locally).
+    _template_legend_added = {"X": False, "Y": False}
+
     for i in range(n_antennas):
         v = e.voltages[i]
         if ADC_traces is not None:
@@ -115,8 +120,13 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
                     rescaled["scaled_template"],
                     linestyle="--",
                     color=color,
-                    label=f"FLT template {channel_label}" if i == 0 else None,
+                    label=(
+                        f"FLT template {channel_label}"
+                        if not _template_legend_added[channel_label]
+                        else None
+                    ),
                 )
+                _template_legend_added[channel_label] = True
 
         axs[i].set_title(title)
         axs[i].set_ylabel("Voltage [ADC]")
