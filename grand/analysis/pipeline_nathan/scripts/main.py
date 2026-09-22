@@ -71,6 +71,13 @@ def main():
     chi2_adf_threshold = cuts_cfg["chi2_adf_cut"]["threshold"]
     logger.info(f"ADF chi2 cut: chi2_adf <= {chi2_adf_threshold}")
 
+    theta_adf_threshold = cuts_cfg["theta_adf_cut"]["threshold"]
+    logger.info(f"ADF theta cut: theta_adf <= {theta_adf_threshold}")
+
+    omega_min = cuts_cfg["omega_cut"]["omega_min"]
+    omega_max = cuts_cfg["omega_cut"]["omega_max"]
+    logger.info(f"Omega cut: {omega_min} <= omega <= {omega_max}")
+
     paths_cfg = config["paths"]
 
     input_dir = Path(paths_cfg["input_dir"])
@@ -132,7 +139,7 @@ def main():
     logger.info("------------------------------------------------------------------------")
     logger.info(f"Processing ROOT file: {rootfile_path.stem}")
     logger.info("------------------------------------------------------------------------")
-    n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_fail = process_file(
+    n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_cut_theta_adf, n_cut_omega_band, n_fail = process_file(
         rootfile_path,
         output_dir,
         antenna_position,
@@ -143,15 +150,18 @@ def main():
         rho_min_threshold=rho_min_threshold,
         rho_mean_threshold=rho_mean_threshold,
         chi2_adf_threshold=chi2_adf_threshold,
+        theta_adf_threshold=theta_adf_threshold,
+        omega_min=omega_min,
+        omega_max=omega_max,
         limit_events=args.limit_events,
         do_plot=args.do_plot,
     )
 
     logger.info(
         f"Done. file={rootfile_path.name}, "
-        f"events_total={n_pass + n_cut_nant + n_cut_nutrig + n_cut_chi2_adf + n_fail}, "
+        f"events_total={n_pass + n_cut_nant + n_cut_nutrig + n_cut_chi2_adf + n_cut_theta_adf + n_cut_omega_band, n_fail}, "
         f"passed={n_pass}, cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, "
-        f"cut_chi2_adf={n_cut_chi2_adf}, failed={n_fail}"
+        f"cut_chi2_adf={n_cut_chi2_adf}, cut_theta_adf={n_cut_theta_adf}, cut_omega_band={n_cut_omega_band}, failed={n_fail}"
     )
 
 if __name__ == "__main__":

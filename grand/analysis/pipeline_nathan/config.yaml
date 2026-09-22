@@ -1,5 +1,6 @@
 paths:
-  input_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/mock_inputs/gp80/GrandRoot/2026/09"
+# Next steps do a RUN_ dependent analysis
+  input_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/mock_inputs/gp80/GrandRoot/2025/07"
   output_dir: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/outputs"
   rtk_antenna_positions_path: "/home/lpnhe/grand/grand/analysis/example/RTK_pos/rtk_pos_gp65_from_xls_gdl.csv"
   nutrig_template_path: "/home/lpnhe/grand/grand/analysis/pipeline_nathan/templates_ZHAireS_DC2.1rc4_RAW_XY_THRESH_100_5.txt"
@@ -22,4 +23,8 @@ cuts:
     rho_mean_threshold: 0.7
   chi2_adf_cut:
     threshold: 25.0
-
+  theta_adf_cut:
+    threshold: 86  
+  omega_cut:
+    omega_min: 0
+    omega_max: 1

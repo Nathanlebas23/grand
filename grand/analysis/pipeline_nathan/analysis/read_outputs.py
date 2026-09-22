@@ -71,18 +71,26 @@ def main():
         t_recons.get_event(ev_no, run_no)
         results = analyze_event(t_recons, ev_no, run_no, config)
         plot_event(t_recons, results, antenna_position, plot_dir)
-        timing = compute_timing_residuals(t_recons)
-        plot_timing_residuals(t_recons, timing, plot_dir)
-        logger.info(f"Plotted event {ev_no} run {run_no}")
+
+        # --------------------
+        # Timing residuals
+        #---------------------
+        # timing = compute_timing_residuals(t_recons)
+        # plot_timing_residuals(t_recons, timing, plot_dir)
+        # logger.info(f"Plotted event {ev_no} run {run_no}")
     else:
         logger.info(f"Analyzing all events in TRecons file {t_recons.file_name}")
         for ev_no, run_no in t_recons.get_list_of_events():
             t_recons.get_event(ev_no, run_no)
             results = analyze_event(t_recons, ev_no, run_no, config)
             plot_event(t_recons, results, antenna_position, plot_dir)
-            timing = compute_timing_residuals(t_recons)
-            plot_timing_residuals(t_recons, timing, plot_dir)
-            logger.info(f"Plotted event {ev_no} run {run_no}")
+
+            # --------------------
+            # Timing residuals
+            #---------------------            
+            # timing = compute_timing_residuals(t_recons)
+            # plot_timing_residuals(t_recons, timing, plot_dir)
+            # logger.info(f"Plotted event {ev_no} run {run_no}")
 
 
 if __name__ == "__main__":
