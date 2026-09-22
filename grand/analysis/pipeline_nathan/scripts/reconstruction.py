@@ -26,7 +26,7 @@ sys.path.append(config['paths']['grandlib_path'])
 logger = logging.getLogger("grand.process")
 
 
-def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, ADC_traces) -> None:
+def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_template, ADC_traces) -> None:
     """Run the PWF/SWF/ADF/energy reconstruction chain for a single event.
 
     Fills the Shower fields on e.shower and prepares trecons's fields
@@ -54,10 +54,11 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, ADC_tra
     # t0_method = ext.compute_t0(e.t0.astype('int64'))
     # logger.debug(f"t0_method (from compute_t0): {t0_method}, t0_method - t0_all.min(): {t0_method - t0_all.min()}")
 
-    # On ADC
+    # Hilbert method
     peak_times = np.array([ext.get_peak_time_efield(ADC_traces[i], t0[i], channels=[0,1,2])
                            for i in range(n_antennas)])
     
+    # Template method
     # peak_times = np.array([ext.get_peak_time_adc(ADC_traces[i], nutrig_template, t0[i])
     #                        for i in range(n_antennas)])
 
@@ -111,7 +112,6 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, ADC_tra
     energy_elm = en.recons_energy_from_voltage(scaling_factor, sin_alpha)
 
     logger.debug(f"Event {e.event_number} (run {run_number}): ADF: theta={np.rad2deg(theta_adf):.3f}, phi={np.rad2deg(phi_adf):.3f}, delta_omega={delta_omega:.3f}, scaling_factor={scaling_factor:.3e}, chi2={chi2_adf:.3f}, energy_elm={energy_elm:.3e}")
-
 
     # ---------------------------------------------------------------
     # Fill only the real, persisting Shower fields - no ad hoc duplicate

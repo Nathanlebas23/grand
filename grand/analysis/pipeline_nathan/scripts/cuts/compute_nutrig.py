@@ -166,45 +166,45 @@ def compute_flt_correlation(
     return result
 
 
-def compute_correlation(
-    trace: np.ndarray,
-    templates: np.ndarray,
-    pre_trigger_sample: Optional[int] = None,
-    **kwargs,
-) -> Dict[str, Any]:
-    """
-    Compute the correlation between a trace and a set of templates.
+# def compute_correlation(
+#     trace: np.ndarray,
+#     templates: np.ndarray,
+#     pre_trigger_sample: Optional[int] = None,
+#     **kwargs,
+# ) -> Dict[str, Any]:
+#     """
+#     Compute the correlation between a trace and a set of templates.
 
-    Definitions:
-    - trace: The input signal trace to be analyzed.
-    - templates: A 2D array where each row is a template to correlate with the trace.
-    - pre_trigger_sample: Required. Specifies the sample index before the trigger to consider for correlation.
-    - kwargs: Additional keyword arguments to pass to the correlation function.
+#     Definitions:
+#     - trace: The input signal trace to be analyzed.
+#     - templates: A 2D array where each row is a template to correlate with the trace.
+#     - pre_trigger_sample: Required. Specifies the sample index before the trigger to consider for correlation.
+#     - kwargs: Additional keyword arguments to pass to the correlation function.
 
-    Output:
-    - A dictionary containing the correlation results, which may include:
-        - 'rho_x': The correlation values for the x-axis.
-        - 'rho_y': The correlation values for the y-axis.
-    Raises:
-    - ImportError: If the nutrig package (FLT method) is not available.
-    - ValueError: If pre_trigger_sample is missing.
-    """
-    if not is_flt_available():
-        raise ImportError(
-            "The 'flt' method requires the nutrig package. "
-            "Add nutrig/ to your PYTHONPATH."
-        )
+#     Output:
+#     - A dictionary containing the correlation results, which may include:
+#         - 'rho_x': The correlation values for the x-axis.
+#         - 'rho_y': The correlation values for the y-axis.
+#     Raises:
+#     - ImportError: If the nutrig package (FLT method) is not available.
+#     - ValueError: If pre_trigger_sample is missing.
+#     """
+#     if not is_flt_available():
+#         raise ImportError(
+#             "The 'flt' method requires the nutrig package. "
+#             "Add nutrig/ to your PYTHONPATH."
+#         )
 
-    if pre_trigger_sample is None:
-        raise ValueError("pre_trigger_sample is required")
+#     if pre_trigger_sample is None:
+#         raise ValueError("pre_trigger_sample is required")
 
-    # Call the FLT backend (handles templates internally via the .npz file)
-    result = compute_flt_correlation(
-        trace=trace,
-        pre_trigger_sample=pre_trigger_sample,
-        **kwargs,
-    )
-    return result
+#     # Call the FLT backend (handles templates internally via the .npz file)
+#     result = compute_flt_correlation(
+#         trace=trace,
+#         pre_trigger_sample=pre_trigger_sample,
+#         **kwargs,
+#     )
+#     return result
 
 
 def compute_rho_event_score(

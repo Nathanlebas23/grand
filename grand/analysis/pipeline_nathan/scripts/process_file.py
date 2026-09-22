@@ -10,12 +10,12 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 #-------------------------------
 # Load GRANDlib
 #-------------------------------
-from grand.analysis.pipeline_nathan.scripts.loading import load_config
+from grand.analysis.pipeline_nathan.scripts.loading import load_config, log_memory
 
 config_path = Path(__file__).parent.parent / "config.yaml"
 config = load_config(config_path)
@@ -45,13 +45,15 @@ def process_file(
     output_dir: Path,
     antenna_position: pd.DataFrame,
     n_ant_cut: int,
-    nutrig_src_path,
+    nutrig_templates_txt,
     templates_npz_path,
+    nutrig_src_path,
     rho_min_threshold: float,
     rho_mean_threshold: float,
+    chi2_adf_threshold: float,
     limit_events=None,
     do_plot=False
-    ) -> tuple[int, int, int, int]:
+    ) -> tuple[int, int, int, int, int]:
     """Process a single ROOT file and write the output to the specified directory."""
 
     logger.info(f"Opening ROOT file: {rootfile_path}")
@@ -80,9 +82,13 @@ def process_file(
     n_pass = 0
     n_cut_nant = 0
     n_cut_nutrig = 0
+    n_cut_chi2_adf = 0
     n_fail = 0
 
     for event_number, run_number in targets: # Iterate over the events in the ROOT file 0,1,..
+        if event_number % 50 == 0:
+            log_memory(f"event {event_number} start")
+
         e = el.get_event(event_number=event_number, run_number=run_number)
 
         if e is None:
@@ -109,11 +115,17 @@ def process_file(
         # propagate out of process_file()/main(), not be swallowed by the try/except
         # below. Only per-channel local failures (caught inside compute_nutrig_event)
         # turn into a per-event NUTRIG cut.
+        if event_number % 50 == 0:
+            log_memory(f"event {event_number} before NUTRIG")
+
         nutrig_result = compute_nutrig_event(
             e,
-            nutrig_src_path=nutrig_src_path,
             templates_npz_path=templates_npz_path,
+            nutrig_src_path=nutrig_src_path,
         )
+
+        if event_number % 50 == 0:
+            log_memory(f"event {event_number} after NUTRIG")
 
         if not passes_nutrig_cut(
             nutrig_result,
@@ -135,8 +147,18 @@ def process_file(
                 antenna_position,
                 trecons,
                 run_number,
+                nutrig_template=nutrig_templates_txt, # Single 1D template (load_nutrig_template already selects row 0)
                 ADC_traces=nutrig_result["ADC_traces"],
             )
+
+            chi2_adf = trecons.chi2_adf
+            if not np.isfinite(chi2_adf) or chi2_adf > chi2_adf_threshold:
+                logger.debug(
+                    f"Event {event_number} (run {run_number}) skipped: "
+                    f"chi2_adf cut (chi2_adf={chi2_adf} > threshold={chi2_adf_threshold:.3f})"
+                )
+                n_cut_chi2_adf += 1
+                continue
 
             trecons.rho_x = nutrig_result["rho_x"]
             trecons.rho_y = nutrig_result["rho_y"]
@@ -225,6 +247,7 @@ def process_file(
         logger.debug(f"Event {event_number} (run {run_number}) reconstructed OK")
 
         if do_plot:
+            log_memory(f"event {event_number} before plot")
             try:
                 plot_traces(
                     e,
@@ -233,6 +256,7 @@ def process_file(
                     ADC_traces=nutrig_result["ADC_traces"],
                     nutrig_result=nutrig_result,
                 )
+                logger.debug("Open matplotlib figures: %s", plt.get_fignums())
             except Exception as exc:
                 logger.warning(
                     "Event plotting failed for event %s (run %s): %s",
@@ -242,6 +266,7 @@ def process_file(
                 )
                 logger.debug("Full traceback:", exc_info=True)
 
+            log_memory(f"event {event_number} after plot")
     if n_pass > 0:
         trecons_path = output_dir / f"{rootfile_path.stem}_trecons.root"
         trecons.write(str(trecons_path), overwrite=True)
@@ -251,8 +276,9 @@ def process_file(
     else:
         logger.warning(
             f"No event reconstructed successfully in {rootfile_path.name} "
-            f"(cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, failed={n_fail}); "
+            f"(cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, "
+            f"cut_chi2_adf={n_cut_chi2_adf}, failed={n_fail}); "
             f"TRecons output not written"
         )
 
-    return n_pass, n_cut_nant, n_cut_nutrig, n_fail
+    return n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_fail

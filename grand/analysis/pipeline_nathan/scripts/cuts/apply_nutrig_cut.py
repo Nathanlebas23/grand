@@ -14,7 +14,7 @@ import numpy as np
 import grand.analysis.signals.extraction as ext
 from grand.analysis.pipeline_nathan.scripts.cuts.compute_nutrig import (
     is_flt_available,
-    compute_correlation,
+    compute_flt_correlation,
     compute_rho_event_score,
 )
 
@@ -23,7 +23,7 @@ from grand.analysis.pipeline_nathan.scripts.cuts.compute_nutrig import (
 # the bulky all_corr/all_times/t_corr diagnostic arrays are dropped.
 _RESULT_KEYS_TO_KEEP = ("rho_max", "best_position", "template_best", "ts")
 
-
+# Could use get_peak_time_adc() from extraction.py, but that function is not
 def _peak_idx_per_channel(channel_trace: np.ndarray) -> int:
     """argmax(|channel_trace|) - independent per-channel peak sample,
     matching the historical precompute_precise_time_and_peaks()'s X/Y logic."""
@@ -32,8 +32,8 @@ def _peak_idx_per_channel(channel_trace: np.ndarray) -> int:
 
 def compute_nutrig_event(
     e,
-    nutrig_src_path,
     templates_npz_path,
+    nutrig_src_path,
 ) -> Dict[str, Any]:
     """Compute per-antenna NUTRIG FLT rho_x/rho_y/rho_max and the event-level
     rho_min/rho_mean/n_valid score for every DU in e.voltages (same order).
@@ -45,7 +45,7 @@ def compute_nutrig_event(
     leaves that channel's rho as NaN; compute_rho_event_score() then falls
     back to the other channel for that antenna.
     """
-    if not is_flt_available(nutrig_path=Path(nutrig_src_path)):
+    if not is_flt_available(nutrig_path=nutrig_src_path):
         raise ImportError(
             f"nutrig.flt package not available (nutrig_src_path={nutrig_src_path!r}). "
             "Check paths.nutrig_src_path in config.yaml."
@@ -64,9 +64,8 @@ def compute_nutrig_event(
     for i in range(n_antennas):
         try:
             peak_idx_x = _peak_idx_per_channel(ADC_traces[i, 0])
-            rx = compute_correlation(
+            rx = compute_flt_correlation(
                 ADC_traces[i, 0],
-                templates=None,  # unused by compute_flt_correlation - templates come from templates_npz_path
                 pre_trigger_sample=peak_idx_x,
                 templates_npz_path=templates_npz_path,
             )
@@ -77,9 +76,8 @@ def compute_nutrig_event(
 
         try:
             peak_idx_y = _peak_idx_per_channel(ADC_traces[i, 1])
-            ry = compute_correlation(
+            ry = compute_flt_correlation(
                 ADC_traces[i, 1],
-                templates=None,
                 pre_trigger_sample=peak_idx_y,
                 templates_npz_path=templates_npz_path,
             )

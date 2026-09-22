@@ -9,6 +9,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+import resource
+import matplotlib.pyplot as plt
+
 
 logger = logging.getLogger("grand.process")
 
@@ -75,3 +78,12 @@ def get_trecons_path(paths_cfg, file_number: int) -> tuple[Path, Path]:
             f"{trecons_path} not found - run scripts/main.py {file_number} first."
         )
     return trecons_path, rootfile_path
+
+def log_memory(label):
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    logger.info(
+        "%s | max RSS = %.1f MB | open figures = %s",
+        label,
+        rss_mb,
+        plt.get_fignums(),
+    )

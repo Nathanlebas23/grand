@@ -18,10 +18,8 @@ cuts:
   nant_cut:
     threshold: 5
   nutrig_cut:
-    # 0.5 is the historical per-channel/per-antenna rho threshold from the old
-    # ADF_efficiency reference (flt_rho_threshold / rho_cut) - reused here as a
-    # starting point for the new event-level rho_min/rho_mean cut, not an
-    # independently re-derived value. Tune against real data.
     rho_min_threshold: 0.5
-    rho_mean_threshold: 0.5
+    rho_mean_threshold: 0.7
+  chi2_adf_cut:
+    threshold: 25.0
 

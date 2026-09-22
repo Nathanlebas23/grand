@@ -27,7 +27,8 @@ set_style()
 ## 
 
 def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=None):
-    """Plot X/Y/Z ADC traces for every triggered antenna.
+    """
+    Plot X/Y/Z ADC traces for every triggered antenna.
 
     peak_times, if given, is the per-antenna array (seconds, same order as e.voltages)
     computed by reconstruction.py's reconstruct_event() - overlaid as a vertical line
@@ -44,6 +45,7 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
     X/Y channels (via result_x/result_y + rescale_template_for_trace).
     """
 
+  
     n_antennas = len(e.antennas)
 
     # t0_rel_ns matches reconstruction.py's own t0 computation exactly, needed to convert
@@ -62,87 +64,91 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
         sharex=True,
         squeeze=False,
     )
-    axs = axs[:, 0]
 
-    # Tracks whether each FLT-template legend entry has been added yet - anchored to
-    # the first antenna where that channel's overlay is actually drawn, rather than
-    # unconditionally i == 0 (whose own channel can be the one that failed locally).
-    _template_legend_added = {"X": False, "Y": False}
+    try:
+        axs = axs[:, 0]
 
-    for i in range(n_antennas):
-        v = e.voltages[i]
-        if ADC_traces is not None:
-            traces = np.asarray(ADC_traces[i])
-        else:
-            traces = np.asarray(ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]))
+        # Tracks whether each FLT-template legend entry has been added yet - anchored to
+        # the first antenna where that channel's overlay is actually drawn, rather than
+        # unconditionally i == 0 (whose own channel can be the one that failed locally).
+        _template_legend_added = {"X": False, "Y": False}
 
-        n_samples = traces.shape[-1] # 512 points
-        t_ns = np.arange(n_samples) * v.t_bin_size # 1024 ns
+        for i in range(n_antennas):
+            v = e.voltages[i]
+            if ADC_traces is not None:
+                traces = np.asarray(ADC_traces[i])
+            else:
+                traces = np.asarray(ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]))
 
-        axs[i].plot(t_ns, traces[0], label="X")
-        axs[i].plot(t_ns, traces[1], label="Y")
-        axs[i].plot(t_ns, traces[2], label="Z")
+            n_samples = traces.shape[-1] # 512 points
+            t_ns = np.arange(n_samples) * v.t_bin_size # 1024 ns
 
-        if peak_times is not None:
-            peak_local_ns = peak_times[i] * 1e9 - t0_rel_ns[i]
-            axs[i].axvline(
-                peak_local_ns,
-                color="k",
-                linestyle="--",
-                label="NUTRIG peak time" if i == 0 else None,
-            )
+            axs[i].plot(t_ns, traces[0], label="X")
+            axs[i].plot(t_ns, traces[1], label="Y")
+            axs[i].plot(t_ns, traces[2], label="Z")
 
-        title = f"DU {v.du_id}"
-
-        if nutrig_result is not None:
-            rho_x_i = nutrig_result["rho_x"][i]
-            rho_y_i = nutrig_result["rho_y"][i]
-            rho_max_i = nutrig_result["rho_max"][i]
-            title += f" — rhoX={rho_x_i:.2f}, rhoY={rho_y_i:.2f}, rhoMax={rho_max_i:.2f}"
-
-            # Template overlay: rescale_template_for_trace expects the same raw ADC
-            # units these traces already are in (no unit conversion needed here).
-            for channel_idx, channel_label, result_list, color in (
-                (0, "X", nutrig_result["result_x"], "tab:blue"),
-                (1, "Y", nutrig_result["result_y"], "tab:orange"),
-            ):
-                result_i = result_list[i]
-                if result_i is None:
-                    continue
-                rescaled = rescale_template_for_trace(
-                    traces[channel_idx], result_i["template_best"], result_i["best_position"]
-                )
-                if not rescaled["valid"]:
-                    continue
-                window_ns = np.arange(rescaled["trace_start"], rescaled["trace_end"]) * v.t_bin_size
-                axs[i].plot(
-                    window_ns,
-                    rescaled["scaled_template"],
+            if peak_times is not None:
+                peak_local_ns = peak_times[i] * 1e9 - t0_rel_ns[i]
+                axs[i].axvline(
+                    peak_local_ns,
+                    color=NL_COLORS['black'],
                     linestyle="--",
-                    color=color,
-                    label=(
-                        f"FLT template {channel_label}"
-                        if not _template_legend_added[channel_label]
-                        else None
-                    ),
+                    label="NUTRIG peak time" if i == 0 else None,
                 )
-                _template_legend_added[channel_label] = True
 
-        axs[i].set_title(title)
-        axs[i].set_ylabel("Voltage [ADC]")
-        axs[i].legend()
+            title = f"DU {v.du_id}"
 
-    axs[-1].set_xlabel("Time [ns]")
+            if nutrig_result is not None:
+                rho_x_i = nutrig_result["rho_x"][i]
+                rho_y_i = nutrig_result["rho_y"][i]
+                rho_max_i = nutrig_result["rho_max"][i]
+                title += f" — rhoX={rho_x_i:.2f}, rhoY={rho_y_i:.2f}, rhoMax={rho_max_i:.2f}"
 
-    fig.suptitle(
-        f"Event {e.event_number} - Run {e.run_number}"
-    )
-    fig.tight_layout()
+                # Template overlay: rescale_template_for_trace expects the same raw ADC
+                # units these traces already are in (no unit conversion needed here).
+                for channel_idx, channel_label, result_list, color in (
+                    (0, "X", nutrig_result["result_x"], NL_COLORS['blue']),
+                    (1, "Y", nutrig_result["result_y"], NL_COLORS['orange']),
+                ):
+                    result_i = result_list[i]
+                    if result_i is None:
+                        continue
+                    rescaled = rescale_template_for_trace(
+                        traces[channel_idx], result_i["template_best"], result_i["best_position"]
+                    )
+                    if not rescaled["valid"]:
+                        continue
+                    window_ns = np.arange(rescaled["trace_start"], rescaled["trace_end"]) * v.t_bin_size
+                    axs[i].plot(
+                        window_ns,
+                        rescaled["scaled_template"],
+                        linestyle="--",
+                        color=color,
+                        label=(
+                            f"FLT template {channel_label}"
+                            if not _template_legend_added[channel_label]
+                            else None
+                        ),
+                    )
+                    _template_legend_added[channel_label] = True
 
-    plot_path = (
-        output_dir
-        / f"event_{e.event_number}_run_{e.run_number}_traces.png"
-    )
+            axs[i].set_title(title)
+            axs[i].set_ylabel("Voltage [ADC]")
+            axs[i].legend()
 
-    fig.savefig(plot_path)
-    plt.close(fig)
+        axs[-1].set_xlabel("Time [ns]")
+
+        fig.suptitle(
+            f"Event {e.event_number} - Run {e.run_number}"
+        )
+        fig.tight_layout()
+
+        plot_path = (
+            output_dir
+            / f"event_{e.event_number}_run_{e.run_number}_traces.png"
+        )
+
+        fig.savefig(plot_path, dpi=200)
+
+    finally:
+        plt.close(fig)

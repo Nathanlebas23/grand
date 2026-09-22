@@ -68,6 +68,9 @@ def main():
         f"NUTRIG cut: rho_min >= {rho_min_threshold}, rho_mean >= {rho_mean_threshold}"
     )
 
+    chi2_adf_threshold = cuts_cfg["chi2_adf_cut"]["threshold"]
+    logger.info(f"ADF chi2 cut: chi2_adf <= {chi2_adf_threshold}")
+
     paths_cfg = config["paths"]
 
     input_dir = Path(paths_cfg["input_dir"])
@@ -82,23 +85,15 @@ def main():
     if not template_path.is_file():
         raise FileNotFoundError(f"nutrig_template_path not found: {template_path}")
 
-    # Fail fast on global NUTRIG problems, before opening any ROOT file - a config/
-    # environment problem must stop the pipeline loudly, never degrade into a
-    # per-event NaN/cut (see compute_nutrig_event/passes_nutrig_cut).
-    nutrig_src_path = Path(paths_cfg["nutrig_src_path"])
-    if not nutrig_src_path.is_dir():
-        raise NotADirectoryError(f"nutrig_src_path does not exist or is not a directory: {nutrig_src_path}")
-
     nutrig_templates_npz_path = Path(paths_cfg["nutrig_templates_npz_path"])
     if not nutrig_templates_npz_path.is_file():
         raise FileNotFoundError(f"nutrig_templates_npz_path not found: {nutrig_templates_npz_path}")
 
+    nutrig_src_path = Path(paths_cfg["nutrig_src_path"])
+    if not nutrig_src_path.is_dir():
+        raise NotADirectoryError(f"nutrig_src_path does not exist or is not a directory: {nutrig_src_path}")
     if not is_flt_available(nutrig_path=nutrig_src_path):
-        raise ImportError(
-            f"nutrig.flt package could not be imported from nutrig_src_path={nutrig_src_path}. "
-            "Check paths.nutrig_src_path in config.yaml."
-        )
-    logger.info(f"NUTRIG FLT package available (nutrig_src_path={nutrig_src_path})")
+        raise ImportError(f"nutrig.flt package not importable from nutrig_src_path={nutrig_src_path}")
 
     logger.info(f"Input directory: {input_dir}")
     rootfiles = sorted(input_dir.glob("*.root"), key=natural_sort_key)
@@ -137,23 +132,26 @@ def main():
     logger.info("------------------------------------------------------------------------")
     logger.info(f"Processing ROOT file: {rootfile_path.stem}")
     logger.info("------------------------------------------------------------------------")
-    n_pass, n_cut_nant, n_cut_nutrig, n_fail = process_file(
+    n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_fail = process_file(
         rootfile_path,
         output_dir,
         antenna_position,
         n_ant_cut=n_ant_cut,
-        nutrig_src_path=nutrig_src_path,
+        nutrig_templates_txt = nutrig_template,
         templates_npz_path=nutrig_templates_npz_path,
+        nutrig_src_path=nutrig_src_path,
         rho_min_threshold=rho_min_threshold,
         rho_mean_threshold=rho_mean_threshold,
+        chi2_adf_threshold=chi2_adf_threshold,
         limit_events=args.limit_events,
         do_plot=args.do_plot,
     )
 
     logger.info(
         f"Done. file={rootfile_path.name}, "
-        f"events_total={n_pass + n_cut_nant + n_cut_nutrig + n_fail}, "
-        f"passed={n_pass}, cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, failed={n_fail}"
+        f"events_total={n_pass + n_cut_nant + n_cut_nutrig + n_cut_chi2_adf + n_fail}, "
+        f"passed={n_pass}, cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, "
+        f"cut_chi2_adf={n_cut_chi2_adf}, failed={n_fail}"
     )
 
 if __name__ == "__main__":
