@@ -88,27 +88,27 @@ def log_memory(label):
         plt.get_fignums(),
     )
 
+def load_sims_rootfiles_path(input_dir, file_number: int) -> Path:
+    pattern = f"*_{file_number:04d}"
+    sim_dirs = sorted(d for d in input_dir.glob(pattern) if d.is_dir())
+
+    if not sim_dirs:
+        raise FileNotFoundError(
+            f"No simulation directory matching '{pattern}' in {input_dir}"
+        )
+    # Les variantes -AN_/-NJ_ partagent le meme suffixe : refuser plutot que
+    # d'en choisir une silencieusement.
+    if len(sim_dirs) > 1:
+        raise RuntimeError(
+            f"Ambiguous simulation index {file_number}: {len(sim_dirs)} directories "
+            f"match '{pattern}' in {input_dir}: " + ", ".join(d.name for d in sim_dirs)
+        )
+    rootfile_path = sim_dirs[0]
+
+    return rootfile_path
+
 def get_run_number(rootfile_path, e):
     match = re.search(r'GP80_(\d{4})(\d{2})\d{2}_\d+_RUN(\d+)_', Path(rootfile_path).name)
     if match:
         return int(match.group(3))
-    return e.run_number
-
-# ex : efield_3154-21464_L0_0000.root
-def get_run_number_simulation(rootfile_path, e):
-    """Get run number from a simulation filename.
-
-    Example:
-        efield_3154-21464_L0_0000.root
-                   ^^^^^
-                   run number = 21464
-    """
-    match = re.search(
-        r"efield_(\d+)-(\d+)_L0_",
-        Path(rootfile_path).name,
-    )
-
-    if match:
-        return int(match.group(2))
-
     return e.run_number

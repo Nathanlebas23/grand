@@ -26,7 +26,7 @@ sys.path.append(config['paths']['grandlib_path'])
 logger = logging.getLogger("grand.process")
 
 
-def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_template, ADC_traces, is_simulation) -> None:
+def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_template, ADC_traces, is_simulation, t0, Xants) -> None:
     """Run the PWF/SWF/ADF/energy reconstruction chain for a single event.
 
     Fills the Shower fields on e.shower and prepares trecons's fields
@@ -37,21 +37,21 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_
     once by compute_nutrig_event() and reused here - this function does not know about
     NUTRIG/rho at all, it stays scoped to the physical reconstruction (peaks/PWF/SWF/ADF/energy).
     """
-    n_antennas = len(e.voltages)
+    if is_simulation:
+        n_antennas = len(ADC_traces)
+    else:
+        n_antennas = len(e.voltages)
 
     # ---------------------------------------------------------------
     # Compute peak amplitudes and times for each antenna
     # ---------------------------------------------------------------
+    peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[0, 1, 2])
+                        for i in range(n_antennas)])
 
-    if is_simulation:
-        peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[1, 2, 3])
-                                for i in range(n_antennas)])
-    else:    
-        peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[0, 1, 2])
-                            for i in range(n_antennas)])
-
-    t0 = ext.compute_t0(e.tvoltage)  # t0 in ns
-    logger.debug(f"Event {e.event_number} (run {run_number}): t0 = {t0}")
+    if t0 is None:
+        t0 = ext.compute_t0(e.tvoltage)
+    else:
+        t0 = np.asarray(t0, dtype=float)
 
     # To investigate if the time here is consistent with the method used in the extraction module,
     # we can compute t0 using the compute_t0 function from the extraction module and compare 
@@ -70,15 +70,34 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_
     # ----------------------------------------------------------------
     # Map DU IDs to their positions (X, Y, Z) in GRAND reference frame
     # ----------------------------------------------------------------
-    du_ids = np.array([v.du_id for v in e.voltages]).astype(int)
+    # du_ids = np.array([v.du_id for v in e.voltages]).astype(int)
 
-    du_positions_ev = antenna_position[antenna_position['DU_id'].isin(du_ids)]
-    du_positions_ev = du_positions_ev.set_index('DU_id').loc[du_ids]
-    x_coords = du_positions_ev['x'].astype(float).values
-    y_coords = -du_positions_ev['y'].astype(float).values
-    z_coords = du_positions_ev['z'].astype(float).values + cons.groundAltitude
+    # du_positions_ev = antenna_position[antenna_position['DU_id'].isin(du_ids)]
+    # du_positions_ev = du_positions_ev.set_index('DU_id').loc[du_ids]
+    # x_coords = du_positions_ev['x'].astype(float).values
+    # y_coords = -du_positions_ev['y'].astype(float).values
+    # z_coords = du_positions_ev['z'].astype(float).values + cons.groundAltitude
+    
+    if is_simulation:
+        Xants = np.asarray(Xants, dtype=float)
+    else:
+        du_ids = np.array([v.du_id for v in e.voltages]).astype(int)
 
-    Xants = np.column_stack((x_coords, y_coords, z_coords))
+        du_positions_ev = antenna_position[
+            antenna_position["DU_id"].isin(du_ids)
+        ]
+        du_positions_ev = du_positions_ev.set_index("DU_id").loc[du_ids]
+
+        x_coords = du_positions_ev["x"].astype(float).values
+        y_coords = -du_positions_ev["y"].astype(float).values
+        z_coords = (
+            du_positions_ev["z"].astype(float).values
+            + cons.groundAltitude
+        )
+
+        Xants = np.column_stack(
+            (x_coords, y_coords, z_coords)
+        )
 
     # -------------------------------
     # Plane Wave Fit (PWF)

@@ -26,7 +26,7 @@ set_style()
 ## Le peak time est celui obtenue par reconstruction.py
 ## 
 
-def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=None):
+def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=None, t0_ns=None):
     """
     Plot X/Y/Z ADC traces for every triggered antenna.
 
@@ -55,7 +55,14 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
     if peak_times is not None:
         # t0_all_ns = np.array([v.t0.astype('int64') for v in e.voltages])
         # t0_rel_ns = t0_all_ns - t0_all_ns.min()
-        t0_rel_ns = ext.compute_t0(e.tvoltage)
+        # Must be EXACTLY the t0 that reconstruct_event used to build peak_times, otherwise
+        # the subtraction below mixes two different time references. In simulation that is
+        # compute_t0_sims(tadc) (epoch-anchored), whereas compute_t0(e.tvoltage) anchors on
+        # min(du_seconds) and min(du_nanoseconds) taken independently - when the DUs straddle
+        # a second boundary the two differ by ~1e9 ns, which threw the axvline to -1e9 ns and
+        # autoscaled the whole trace into the right edge of the plot.
+        t0_rel_ns = (np.asarray(t0_ns, dtype=float) if t0_ns is not None
+                     else ext.compute_t0(e.tvoltage))
 
     fig, axs = plt.subplots(
         n_antennas,

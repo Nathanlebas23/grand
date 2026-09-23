@@ -26,13 +26,16 @@ logger = logging.getLogger("grand.process")
 
 from grand.aoi import EventList
 from grand.dataio import TRecons
+import grand.analysis.signals.extraction as ext
 from grand.analysis.pipeline_nathan.scripts.reconstruction import reconstruct_event
 from grand.analysis.pipeline_nathan.scripts.sanity_plot import plot_traces
 from grand.analysis.pipeline_nathan.scripts.cuts.apply_nutrig_cut import (
     compute_nutrig_event,
     passes_nutrig_cut,
 )
-from grand.analysis.pipeline_nathan.scripts.loading import get_run_number, get_run_number_simulation
+from grand.analysis.pipeline_nathan.scripts.loading import get_run_number
+from grand.analysis.pipeline_nathan.scripts.sims_utils import get_antenna_positions_from_run
+
 
 def process_file(
     rootfile_path: Path,
@@ -48,17 +51,31 @@ def process_file(
     theta_adf_threshold: float,
     omega_min: float,
     omega_max: float,
+    omega_excess_threshold: float,
+    amplitude_excess_threshold: float,
     limit_events=None,
     do_plot=False,
     is_simulation=False,
-    ) -> tuple[int, int, int, int, int, int, int]:
+    ) -> tuple[int, int, int, int, int, int, int, int]:
     """Process a single ROOT file and write the output to the specified directory."""
 
     logger.info(f"Opening ROOT file: {rootfile_path}")
 
-    # Check EventList
-    el = EventList(str(rootfile_path), use_trawvoltage=True, trawvoltage_channels=[1, 2, 3])
 
+    # -----------------------------------
+    # Open EventList
+    # -----------------------------------
+    if is_simulation:
+        # En simulation, rootfile_path EST le dossier sim_*_<index> : il contient
+        # adc_*/efield_*/run_*, que DataDirectory associe entre eux.
+        el = EventList(str(rootfile_path))
+    else:
+        el = EventList(
+            str(rootfile_path),
+            use_trawvoltage=True,
+            trawvoltage_channels=[1, 2, 3],
+        )
+ 
     # Determine the list of events to process
     targets = list(el.event_list)
     if limit_events is not None:
@@ -66,16 +83,7 @@ def process_file(
     logger.info(f"{len(targets)} events to process in {rootfile_path.name}")
 
     trecons = TRecons()
-    # Event.write() derives the shower output filename from e.files_creation_time, and
-    # grand.aoi.Event.fill_shower_tree() only reuses/appends to an existing tshower tree when the
-    # filename matches exactly (grand_tree_list lookup keyed on the exact string). On the very
-    # first write to a brand-new output directory, Event.write() itself overwrites whatever value
-    # we pre-set (its internal trun/voltage/efield file-creation bookkeeping assigns
-    # self.files_creation_time = target_dir.cur_time_string the first time those trees need
-    # creating), so a fixed value picked before the loop can still get silently replaced on event 1.
-    # Instead: let the first successful write establish the value, capture whatever it ends up
-    # being, and pin every subsequent event to that exact value.
-    
+
     files_creation_time = None
     n_pass = 0
     n_cut_nant = 0
@@ -83,8 +91,12 @@ def process_file(
     n_cut_chi2_adf = 0
     n_cut_theta_adf = 0
     n_cut_omega_band = 0
+    n_cut_hight_excess_omega = 0
     n_fail = 0
 
+    # --------------------------------------
+    # Iterate over events in the ROOT file
+    # --------------------------------------
     for event_number, run_number in targets: # Iterate over the events in the ROOT file 0,1,..
         if event_number % 50 == 0:
             log_memory(f"event {event_number} start")
@@ -96,8 +108,13 @@ def process_file(
             n_fail += 1
             continue
 
+        # Reset per event: t0 is only assigned on the simulation branch below, and
+        # plot_traces() reads it back. Without this, a failed event could silently reuse
+        # the previous event's t0 when building the peak-time overlay.
+        t0 = None
+
         if is_simulation:
-            run_number = get_run_number_simulation(rootfile_path, e)
+            adc_run_number = 0
         else:
             run_number = get_run_number(rootfile_path, e)
 
@@ -113,17 +130,47 @@ def process_file(
             n_cut_nant += 1
             continue
 
-        # A global NUTRIG failure (package unavailable, bad templates path, ...) is a
-        # configuration problem, not a physically-bad event - it must raise here and
-        # propagate out of process_file()/main(), not be swallowed by the try/except
-        # below. Only per-channel local failures (caught inside compute_nutrig_event)
-        # turn into a per-event NUTRIG cut.
-        nutrig_result = compute_nutrig_event(
-            e,
-            templates_npz_path=templates_npz_path,
-            nutrig_src_path=nutrig_src_path,
-            simulation=is_simulation,
-        )
+
+
+        # -----------------------------------
+        # Apply NUTRIG cut
+        # -----------------------------------
+        # nutrig_result = compute_nutrig_event(
+        #     e,
+        #     templates_npz_path=templates_npz_path,
+        #     nutrig_src_path=nutrig_src_path,
+        #     simulation=is_simulation
+        # )
+        if is_simulation:
+            tadc = el.directory.tadc
+            tadc.get_event(event_number, adc_run_number)
+
+            ADC_traces = np.asarray(
+                tadc.trace_ch,
+                dtype=float,
+            )
+                       
+            logger.debug(
+                "Simulation event %s: Event run=%s, TADC run=%s, ADC shape=%s",
+                event_number,
+                run_number,
+                adc_run_number,
+                ADC_traces.shape,
+            )
+
+            nutrig_result = compute_nutrig_event(
+                e,
+                templates_npz_path=templates_npz_path,
+                nutrig_src_path=nutrig_src_path,
+                adc_traces=ADC_traces,
+            )
+        else:
+            nutrig_result = compute_nutrig_event(
+                e,
+                templates_npz_path=templates_npz_path,
+                nutrig_src_path=nutrig_src_path,
+                adc_traces=None,
+            )
 
         if not passes_nutrig_cut(
             nutrig_result,
@@ -138,18 +185,62 @@ def process_file(
             )
             n_cut_nutrig += 1
             continue
-        
-        try:
-            reconstruct_event(
-                e,
-                antenna_position,
-                trecons,
-                run_number,
-                nutrig_template=nutrig_templates_txt, # Single 1D template (load_nutrig_template already selects row 0)
-                ADC_traces=nutrig_result["ADC_traces"],
-                is_simulation=is_simulation,
-            )
 
+        #--------------------------------
+        # Reconstruct the event
+        #--------------------------------
+        try:
+            if is_simulation:
+
+                tadc = el.directory.tadc
+                tadc.get_event(event_number, adc_run_number)
+
+                ADC_traces = np.asarray(tadc.trace_ch, dtype=float)
+
+                t0 = ext.compute_t0_sims(tadc)
+
+                trun = el.directory.trun
+                du_indices = tadc.get_dus_indices_in_run(trun)
+                Xants = get_antenna_positions_from_run(trun, du_indices)
+
+                logger.debug(
+                    "Simulation event %s: Event run=%s, TADC run=%s, ADC shape=%s",
+                    event_number,
+                    run_number,
+                    adc_run_number,
+                    ADC_traces.shape,
+                )
+
+                t0 = ext.compute_t0_sims(tadc)
+
+                reconstruct_event(
+                    e,
+                    antenna_position,
+                    trecons,
+                    run_number,
+                    nutrig_template=nutrig_templates_txt, # Single 1D template (load_nutrig_template already selects row 0)
+                    ADC_traces=ADC_traces,
+                    is_simulation=is_simulation,
+                    t0=t0,
+                    Xants=Xants
+                )
+
+            else:
+                reconstruct_event(
+                    e,
+                    antenna_position,
+                    trecons,
+                    run_number,
+                    nutrig_template=nutrig_templates_txt, # Single 1D template (load_nutrig_template already selects row 0)
+                    ADC_traces=nutrig_result["ADC_traces"],
+                    is_simulation=is_simulation,
+                    t0=None,
+                    Xants=None
+                )
+
+            # ------------------------------------------
+            # Cuts on reconstructed event parameters
+            # ------------------------------------------
             chi2_adf = trecons.chi2_adf
             if not np.isfinite(chi2_adf) or chi2_adf > chi2_adf_threshold:
                 logger.debug(
@@ -169,24 +260,40 @@ def process_file(
                 continue
 
             omega = np.asarray(trecons.omega, dtype=float).reshape(-1)
+            omega_deg = np.rad2deg(omega)
             logger.debug(
                 f"Event {event_number} (run {run_number}) omega values: "
-                f"{np.rad2deg(omega)} (min={np.nanmin(np.rad2deg(omega)):.2f}, max={np.nanmax(np.rad2deg(omega)):.2f})"
+                f"{omega_deg} (min={np.nanmin(omega_deg):.2f}, max={np.nanmax(omega_deg):.2f})"
             )
 
             if (
                 omega.size == 0
                 or not np.all(np.isfinite(omega))
-                or np.any((np.rad2deg(omega) < omega_min) | (np.rad2deg(omega) > omega_max))
+                or np.any((omega_deg < omega_min) | (omega_deg > omega_max))
             ):
                 logger.debug(
                     f"Event {event_number} (run {run_number}) skipped: "
-                    f"omega cut (range=[{np.nanmin(np.rad2deg(omega)):.2f}, {np.nanmax(np.rad2deg(omega)):.2f}], "
+                    f"omega cut (range=[{np.nanmin(omega_deg):.2f}, {np.nanmax(omega_deg):.2f}], "
                     f"allowed=[{omega_min:.2f}, {omega_max:.2f}])"
                 )
                 n_cut_omega_band += 1
                 continue
-            
+
+            peak_amps = np.asarray(trecons.peak_amps, dtype=float)
+
+            if np.any(
+                (np.rad2deg(omega) > omega_excess_threshold)
+                & (peak_amps > amplitude_excess_threshold)
+            ):
+                logger.debug(
+                    f"Event {event_number} (run {run_number}) skipped: "
+                    f"high omega excess cut "
+                    f"(omega_excess_threshold={omega_excess_threshold:.2f}, "
+                    f"amplitude_excess_threshold={amplitude_excess_threshold:.2f})"
+                )
+                n_cut_hight_excess_omega += 1
+                continue
+                        
             trecons.rho_x = nutrig_result["rho_x"]
             trecons.rho_y = nutrig_result["rho_y"]
             trecons.rho_max = nutrig_result["rho_max"]
@@ -273,6 +380,10 @@ def process_file(
         n_pass += 1
         logger.debug(f"Event {event_number} (run {run_number}) reconstructed OK")
 
+
+        # -----------------------------------
+        # Plotting Traces
+        # -----------------------------------
         if do_plot:
             log_memory(f"event {event_number} before plot")
             try:
@@ -282,6 +393,7 @@ def process_file(
                     peak_times=peak_times,
                     ADC_traces=nutrig_result["ADC_traces"],
                     nutrig_result=nutrig_result,
+                    t0_ns=t0,
                 )
                 logger.debug("Open matplotlib figures: %s", plt.get_fignums())
             except Exception as exc:
@@ -293,6 +405,10 @@ def process_file(
                 )
                 logger.debug("Full traceback:", exc_info=True)
 
+
+    # ---------------------------------------
+    # Diagnostic and write TRecons output
+    # ---------------------------------------
     if n_pass > 0:
         trecons_path = output_dir / f"{rootfile_path.stem}_trecons.root"
         trecons.write(str(trecons_path), overwrite=True)
@@ -303,8 +419,8 @@ def process_file(
         logger.warning(
             f"No event reconstructed successfully in {rootfile_path.name} "
             f"(cut_nant={n_cut_nant}, cut_nutrig={n_cut_nutrig}, "
-            f"cut_chi2_adf={n_cut_chi2_adf}, cut_theta_adf={n_cut_theta_adf}, cut_omega_band={n_cut_omega_band}, failed={n_fail});"
+            f"cut_chi2_adf={n_cut_chi2_adf}, cut_theta_adf={n_cut_theta_adf}, cut_omega_band={n_cut_omega_band}, cut_hgih_excess_omega={n_cut_hight_excess_omega}, failed={n_fail});"
             f"TRecons output not written"
         )
 
-    return n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_cut_theta_adf, n_cut_omega_band, n_fail
+    return n_pass, n_cut_nant, n_cut_nutrig, n_cut_chi2_adf, n_cut_theta_adf, n_cut_omega_band, n_cut_hight_excess_omega, n_fail

@@ -37,7 +37,7 @@ def compute_nutrig_event(
     e,
     templates_npz_path,
     nutrig_src_path,
-    simulation=False,
+    adc_traces,
     ) -> Dict[str, Any]:
     """Compute per-antenna NUTRIG FLT rho_x/rho_y/rho_max and the event-level
     rho_min/rho_mean/n_valid score for every DU in e.voltages (same order).
@@ -55,18 +55,19 @@ def compute_nutrig_event(
             "Check paths.nutrig_src_path in config.yaml."
         )
 
-    n_antennas = len(e.voltages)
-
-    if simulation:
-        ADC_traces = np.array(
-                [ext.convert_voltage_to_ADC(v.trace, channels=[1, 2, 3]) for v in e.voltages]
-            )
-        logger.debug(f"ADC_traces shape: {ADC_traces.shape} (simulation mode)")
-        
+    if adc_traces is not None:
+        ADC_traces = np.asarray(adc_traces, dtype=float)
+        n_antennas = len(ADC_traces)
     else:
         ADC_traces = np.array(
-                [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
-            )
+            [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
+        )
+        n_antennas = len(e.voltages)
+
+    # n_antennas = len(e.voltages)
+
+
+    logger.debug(f"ADC_traces shape: {ADC_traces.shape} (simulation mode)")
         
     rho_x = np.full(n_antennas, np.nan, dtype=float)
     rho_y = np.full(n_antennas, np.nan, dtype=float)

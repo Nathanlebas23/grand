@@ -5,15 +5,19 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+import logging
 
 #-------------------------------
 # Load GRANDlib and nl_style
 #-------------------------------
 from grand.analysis.pipeline_nathan.scripts.loading import load_config
+from grand.analysis.pipeline_nathan.analysis.event_analysis import determine_dead_or_alive_DUs
 
 config_path = Path(__file__).parent.parent / "config.yaml"
 config = load_config(config_path)
+
+
+logger = logging.getLogger("grand.process")
 
 sys.path.append(config['paths']['grandlib_path'])
 sys.path.append(config['paths']['nl_style_path'])
@@ -138,6 +142,10 @@ def plot_footprint(
     )
 
     # All DUs on site
+    alive_DUs, dead_DUs = determine_dead_or_alive_DUs(t_recons)
+    logger.info(f"Alive DUs: {alive_DUs}, Dead DUs: {dead_DUs}")
+
+    
     ax.scatter(
         -antenna_position["y"] / 1000,
         antenna_position["x"] / 1000,
