@@ -55,6 +55,15 @@ def compute_t0(t_object):
     t0 = (np.array(t_object.du_seconds) - event_second) * 1e9 - event_nano + np.array(t_object.du_nanoseconds)
     return t0
 
+def compute_t0_sims(adc_tree):
+    """
+    Compute the initial time (t0) for each trace in nanoseconds for simulation data.
+    """
+    t0_ns = (
+        (np.asarray(adc_tree.du_seconds) - 200854920.0) * 1e9
+        + np.asarray(adc_tree.du_nanoseconds)
+    )
+    return t0_ns
 
 def get_peak_time_efield(trace, t0, channels, dt_ns=2):
     """
