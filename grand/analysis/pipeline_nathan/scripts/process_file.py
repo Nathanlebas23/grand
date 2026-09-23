@@ -32,13 +32,7 @@ from grand.analysis.pipeline_nathan.scripts.cuts.apply_nutrig_cut import (
     compute_nutrig_event,
     passes_nutrig_cut,
 )
-
-
-def get_run_number(rootfile_path, e):
-    match = re.search(r'GP80_(\d{4})(\d{2})\d{2}_\d+_RUN(\d+)_', Path(rootfile_path).name)
-    if match:
-        return int(match.group(3))
-    return e.run_number
+from grand.analysis.pipeline_nathan.scripts.loading import get_run_number, get_run_number_simulation
 
 def process_file(
     rootfile_path: Path,
@@ -55,7 +49,8 @@ def process_file(
     omega_min: float,
     omega_max: float,
     limit_events=None,
-    do_plot=False
+    do_plot=False,
+    is_simulation=False,
     ) -> tuple[int, int, int, int, int, int, int]:
     """Process a single ROOT file and write the output to the specified directory."""
 
@@ -101,7 +96,10 @@ def process_file(
             n_fail += 1
             continue
 
-        run_number = get_run_number(rootfile_path, e)
+        if is_simulation:
+            run_number = get_run_number_simulation(rootfile_path, e)
+        else:
+            run_number = get_run_number(rootfile_path, e)
 
         n_antennas = len(e.antennas)
         logger.debug(f"Event {event_number} (run {run_number}) has {n_antennas} antennas triggered")
@@ -124,12 +122,13 @@ def process_file(
             e,
             templates_npz_path=templates_npz_path,
             nutrig_src_path=nutrig_src_path,
+            simulation=is_simulation,
         )
 
         if not passes_nutrig_cut(
             nutrig_result,
             rho_min_threshold,
-            rho_mean_threshold,
+            rho_mean_threshold
         ):
             logger.debug(
                 f"Event {event_number} (run {run_number}) skipped: "
@@ -148,6 +147,7 @@ def process_file(
                 run_number,
                 nutrig_template=nutrig_templates_txt, # Single 1D template (load_nutrig_template already selects row 0)
                 ADC_traces=nutrig_result["ADC_traces"],
+                is_simulation=is_simulation,
             )
 
             chi2_adf = trecons.chi2_adf
@@ -169,16 +169,20 @@ def process_file(
                 continue
 
             omega = np.asarray(trecons.omega, dtype=float).reshape(-1)
+            logger.debug(
+                f"Event {event_number} (run {run_number}) omega values: "
+                f"{np.rad2deg(omega)} (min={np.nanmin(np.rad2deg(omega)):.2f}, max={np.nanmax(np.rad2deg(omega)):.2f})"
+            )
 
             if (
                 omega.size == 0
                 or not np.all(np.isfinite(omega))
-                or np.any((omega < omega_min) | (omega > omega_max))
+                or np.any((np.rad2deg(omega) < omega_min) | (np.rad2deg(omega) > omega_max))
             ):
                 logger.debug(
                     f"Event {event_number} (run {run_number}) skipped: "
-                    f"omega cut (range=[{np.nanmin(omega):.3f}, {np.nanmax(omega):.3f}], "
-                    f"allowed=[{omega_min:.3f}, {omega_max:.3f}])"
+                    f"omega cut (range=[{np.nanmin(np.rad2deg(omega)):.2f}, {np.nanmax(np.rad2deg(omega)):.2f}], "
+                    f"allowed=[{omega_min:.2f}, {omega_max:.2f}])"
                 )
                 n_cut_omega_band += 1
                 continue

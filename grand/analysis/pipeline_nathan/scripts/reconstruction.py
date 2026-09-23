@@ -26,7 +26,7 @@ sys.path.append(config['paths']['grandlib_path'])
 logger = logging.getLogger("grand.process")
 
 
-def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_template, ADC_traces) -> None:
+def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_template, ADC_traces, is_simulation) -> None:
     """Run the PWF/SWF/ADF/energy reconstruction chain for a single event.
 
     Fills the Shower fields on e.shower and prepares trecons's fields
@@ -42,8 +42,13 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_
     # ---------------------------------------------------------------
     # Compute peak amplitudes and times for each antenna
     # ---------------------------------------------------------------
-    peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[0, 1, 2])
-                          for i in range(n_antennas)])
+
+    if is_simulation:
+        peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[1, 2, 3])
+                                for i in range(n_antennas)])
+    else:    
+        peak_amps = np.array([ext.get_peak_amplitude(ADC_traces[i], channels=[0, 1, 2])
+                            for i in range(n_antennas)])
 
     t0 = ext.compute_t0(e.tvoltage)  # t0 in ns
     logger.debug(f"Event {e.event_number} (run {run_number}): t0 = {t0}")
@@ -55,12 +60,12 @@ def reconstruct_event(e, antenna_position, trecons: TRecons, run_number, nutrig_
     # logger.debug(f"t0_method (from compute_t0): {t0_method}, t0_method - t0_all.min(): {t0_method - t0_all.min()}")
 
     # Hilbert method
-    peak_times = np.array([ext.get_peak_time_efield(ADC_traces[i], t0[i], channels=[0,1,2])
-                           for i in range(n_antennas)])
+    # peak_times = np.array([ext.get_peak_time_efield(ADC_traces[i], t0[i], channels=[0,1,2])
+    #                        for i in range(n_antennas)])
     
     # Template method
-    # peak_times = np.array([ext.get_peak_time_adc(ADC_traces[i], nutrig_template, t0[i])
-    #                        for i in range(n_antennas)])
+    peak_times = np.array([ext.get_peak_time_adc(ADC_traces[i], nutrig_template, t0[i])
+                           for i in range(n_antennas)])
 
     # ----------------------------------------------------------------
     # Map DU IDs to their positions (X, Y, Z) in GRAND reference frame

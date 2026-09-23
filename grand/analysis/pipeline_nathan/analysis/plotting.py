@@ -45,6 +45,7 @@ def plot_ADC_vs_omega(
         peak_amps,
         "ob",
         label="max ADC @ DU",
+        zorder=10,
     )
 
     ax.errorbar(
@@ -96,7 +97,7 @@ def plot_ADC_vs_omega(
     fig.suptitle(fsuptit, fontsize=10)
     ax.set_title(ftit_adf)
 
-    fig.savefig(plot_dir/ f"ADC_vs_omega_event_{t_recons.event_number}_run_{t_recons.run_number}.png", dpi=200)
+    fig.savefig(plot_dir/ f"ADC_vs_omega_event_{t_recons.event_number}_run_{t_recons.run_number}.png")
 
     plt.close(fig)
 
@@ -118,28 +119,28 @@ def plot_footprint(
 ):
     """Plot the 2D footprint of the event on the ground."""
 
-    distm = 5000  # distance in meters
+    distm = 5  # distance in k_meters
     xmin, xmax = -distm, distm
     ymin, ymax = -distm, distm
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots()
 
     # Triggered DUs: color and size proportional to amplitude
     amplitudes = np.asarray(t_recons.adf_amplitude)
 
     sc = ax.scatter(
-        Xants[:, 1],
-        Xants[:, 0],
+        Xants[:, 1] / 1000,
+        Xants[:, 0] / 1000,
         c=amplitudes,
-        cmap="RdBu_r",
+        cmap="Reds",
         s=amplitudes,
         label="Triggered DUs",
     )
 
     # All DUs on site
     ax.scatter(
-        -antenna_position["y"],
-        antenna_position["x"],
+        -antenna_position["y"] / 1000,
+        antenna_position["x"] / 1000,
         marker="+",
         color=NL_COLORS["black"],
         label="DUs on site",
@@ -149,12 +150,12 @@ def plot_footprint(
 
     # Shower direction arrow
     ax.arrow(
-        Xcore[1] - K[1] * 1e3,
-        Xcore[0] - K[0] * 1e3,
-        K[1] * 1e3,
-        K[0] * 1e3,
-        head_width=100,
-        head_length=150,
+        (Xcore[1] - K[1] * 3000) / 1000 ,
+        (Xcore[0] - K[0] * 3000) / 1000,
+        K[1],
+        K[0],
+        head_width=0.1,
+        head_length=0.15,
         fc="black",
         ec="black",
         length_includes_head=True,
@@ -162,47 +163,38 @@ def plot_footprint(
 
     # Core position
     ax.plot(
-        Xcore[1],
-        Xcore[0],
+        Xcore[1] / 1000,
+        Xcore[0] / 1000,
         "ko",
         label="Core",
+        markersize=5,
+        zorder=1,
     )
 
     # Cherenkov ellipse
     ax.plot(
-        x_ell[:, 1],
-        x_ell[:, 0],
+        x_ell[:, 1] / 1000,
+        x_ell[:, 0] / 1000,
         "--k",
-        linewidth=2,
+        linewidth=1.5,
         label="Cherenkov ellipse",
     )
-
-    # if x_ell_min is not None and x_ell_max is not None:
-    #     ax.plot(
-    #         x_ell_min[:, 1],
-    #         x_ell_min[:, 0],
-    #         "--",
-    #         color=NL_COLORS["orange"],
-    #         linewidth=1.5,
-    #         label=rf"$\omega \in \left[ {np.rad2deg(omega_ell_min):.1f}, {np.rad2deg(omega_ell_max):.1f} \right] \, ^\circ$)",
-    #     )
-
-    #     ax.plot(
-    #         x_ell_max[:, 1],
-    #         x_ell_max[:, 0],
-    #         "--",
-    #         color=NL_COLORS["red"],
-    #         linewidth=1.5,
-    #     )
 
     if x_ell_min is not None and x_ell_max is not None:
 
         # Coordinates in the plotting frame
-        x_min = x_ell_min[:, 1]
-        y_min = x_ell_min[:, 0]
+        x_min = x_ell_min[:, 1] / 1000
+        y_min = x_ell_min[:, 0] / 1000
 
-        x_max = x_ell_max[:, 1]
-        y_max = x_ell_max[:, 0]
+        x_max = x_ell_max[:, 1] / 1000
+        y_max = x_ell_max[:, 0] / 1000
+
+        x_min_closed = np.r_[x_min, x_min[0]]
+        y_min_closed = np.r_[y_min, y_min[0]]
+
+        x_max_closed = np.r_[x_max, x_max[0]]
+        y_max_closed = np.r_[y_max, y_max[0]]
+                
 
         # Light fill between the two ellipses
         if (
@@ -211,11 +203,12 @@ def plot_footprint(
             and np.all(np.isfinite(x_max))
             and np.all(np.isfinite(y_max))
         ):
+
             ax.fill(
-                np.concatenate([x_min, x_max[::-1]]),
-                np.concatenate([y_min, y_max[::-1]]),
+                np.concatenate([x_min_closed, x_max_closed[::-1]]),
+                np.concatenate([y_min_closed, y_max_closed[::-1]]),
                 color=NL_COLORS["orange"],
-                alpha=0.12,
+                alpha=0.2,
                 linewidth=0,
                 label=(
                     rf"$\omega \in "
@@ -224,24 +217,21 @@ def plot_footprint(
                 ),
             )
 
-        # Inner boundary
         ax.plot(
-            x_min,
-            y_min,
+            x_min_closed,
+            y_min_closed,
             "--",
             color=NL_COLORS["orange"],
-            linewidth=1.5,
+            linewidth=1,
         )
 
-        # Outer boundary
         ax.plot(
-            x_max,
-            y_max,
+            x_max_closed,
+            y_max_closed,
             "--",
             color=NL_COLORS["orange"],
-            linewidth=1.5,
+            linewidth=1,
         )
-
     ax.set_xlabel("Easting [m]")
     ax.set_ylabel("Northing [m]")
 
@@ -254,12 +244,48 @@ def plot_footprint(
     ax.set_title(ftit_adf)
     fig.suptitle(fsuptit, fontsize=10)
 
-    ax.legend(frameon=False)
+    # fig.suptitle(
+    # f"Event {t_recons.event_number} — Run {t_recons.run_number}",
+    # fontsize=12,
+    # y=0.90,
+    # )
+
+    # -----------------------------------------------
+    # Add reconstruction results as text on the plot
+    # -----------------------------------------------
+
+    # ndf = t_recons.du_count - 4
+    # chi2_adf_reduced = (
+    #     t_recons.chi2_adf / ndf
+    #     if ndf > 0
+    #     else np.nan
+    # )
+
+    # reco_text = (
+    #     rf"$\theta = {np.rad2deg(t_recons.zenith_adf):.1f}^\circ$"
+    #     "\n"
+    #     rf"$\phi = {np.rad2deg(t_recons.azimuth_adf):.1f}^\circ$"
+    #     "\n"
+    #     rf"$\chi^2_{{\rm ADF}}/\mathrm{{ndf}} = {chi2_adf_reduced:.2f}$"
+    #     "\n"
+    #     rf"$\omega_c = {np.rad2deg(omega_cr_mean):.2f}^\circ$"
+    # )
+
+    # ax.text(
+    #     0.05,
+    #     0.95,
+    #     reco_text,
+    #     transform=ax.transAxes,
+    #     ha="left",
+    #     va="top",
+    #     fontsize=9,
+    # )
+
+    ax.legend(frameon=False, loc="best", fontsize=9)
 
     fig.savefig(
         plot_dir
         / f"footprint_event_{t_recons.event_number}_run_{t_recons.run_number}.png",
-        dpi=200,
         bbox_inches="tight",
     )
 

@@ -41,6 +41,11 @@ def main():
         action="store_true",
         help="Whether to generate plots for each event (default: False).",
     )
+    parser.add_argument(
+        "--simulation",
+        action="store_true",
+        help="Whether the input ROOT files are from simulation (default: False).",
+    )
 
     args = parser.parse_args()
 
@@ -57,6 +62,10 @@ def main():
     setup_logger(level=log_cfg.get("level", "INFO"), log_file=log_cfg.get("log_file"))
     logger.info(f"Config loaded from {args.config}")
 
+
+    #############
+    # Load cuts #
+    #############        
     cuts_cfg = config["cuts"]
     n_ant_cut = cuts_cfg["nant_cut"]["threshold"]
     logger.info(f"Antenna multiplicity cut: n_antennas >= {n_ant_cut}")
@@ -78,6 +87,9 @@ def main():
     omega_max = cuts_cfg["omega_cut"]["omega_max"]
     logger.info(f"Omega cut: {omega_min} <= omega <= {omega_max}")
 
+    ##############
+    # Load paths #
+    ##############     
     paths_cfg = config["paths"]
 
     input_dir = Path(paths_cfg["input_dir"])
@@ -155,6 +167,7 @@ def main():
         omega_max=omega_max,
         limit_events=args.limit_events,
         do_plot=args.do_plot,
+        is_simulation=args.simulation,
     )
 
     logger.info(

@@ -6,8 +6,8 @@ Reproduces the historical per-channel FLT correlation implementation
 peak sample, rho_max = max(rho_x, rho_y) per antenna) on top of the current
 pipeline's ADC traces, plus the event-level rho_min/rho_mean cut.
 """
-from pathlib import Path
 from typing import Any, Dict, List, Optional
+import logging
 
 import numpy as np
 
@@ -17,6 +17,9 @@ from grand.analysis.pipeline_nathan.scripts.cuts.compute_nutrig import (
     compute_flt_correlation,
     compute_rho_event_score,
 )
+
+
+logger = logging.getLogger("grand.process")
 
 # Keys kept from each per-channel FLT result dict - just enough for the
 # sanity-plot template overlay (rescale_template_for_trace) and a title;
@@ -34,7 +37,8 @@ def compute_nutrig_event(
     e,
     templates_npz_path,
     nutrig_src_path,
-) -> Dict[str, Any]:
+    simulation=False,
+    ) -> Dict[str, Any]:
     """Compute per-antenna NUTRIG FLT rho_x/rho_y/rho_max and the event-level
     rho_min/rho_mean/n_valid score for every DU in e.voltages (same order).
 
@@ -52,10 +56,18 @@ def compute_nutrig_event(
         )
 
     n_antennas = len(e.voltages)
-    ADC_traces = np.array(
-        [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
-    )
 
+    if simulation:
+        ADC_traces = np.array(
+                [ext.convert_voltage_to_ADC(v.trace, channels=[1, 2, 3]) for v in e.voltages]
+            )
+        logger.debug(f"ADC_traces shape: {ADC_traces.shape} (simulation mode)")
+        
+    else:
+        ADC_traces = np.array(
+                [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
+            )
+        
     rho_x = np.full(n_antennas, np.nan, dtype=float)
     rho_y = np.full(n_antennas, np.nan, dtype=float)
     result_x: List[Optional[Dict[str, Any]]] = [None] * n_antennas

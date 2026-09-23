@@ -87,3 +87,28 @@ def log_memory(label):
         rss_mb,
         plt.get_fignums(),
     )
+
+def get_run_number(rootfile_path, e):
+    match = re.search(r'GP80_(\d{4})(\d{2})\d{2}_\d+_RUN(\d+)_', Path(rootfile_path).name)
+    if match:
+        return int(match.group(3))
+    return e.run_number
+
+# ex : efield_3154-21464_L0_0000.root
+def get_run_number_simulation(rootfile_path, e):
+    """Get run number from a simulation filename.
+
+    Example:
+        efield_3154-21464_L0_0000.root
+                   ^^^^^
+                   run number = 21464
+    """
+    match = re.search(
+        r"efield_(\d+)-(\d+)_L0_",
+        Path(rootfile_path).name,
+    )
+
+    if match:
+        return int(match.group(2))
+
+    return e.run_number
