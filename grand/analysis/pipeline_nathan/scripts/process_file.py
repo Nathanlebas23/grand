@@ -34,7 +34,7 @@ from grand.analysis.pipeline_nathan.scripts.cuts.apply_nutrig_cut import (
     passes_nutrig_cut,
 )
 from grand.analysis.pipeline_nathan.scripts.loading import get_run_number
-from grand.analysis.pipeline_nathan.scripts.sims_utils import get_antenna_positions_from_run
+from grand.analysis.pipeline_nathan.scripts.sims_utils import get_antenna_positions_from_run, trigger_adc, dict_trigger_parameter
 
 
 def process_file(
@@ -195,20 +195,33 @@ def process_file(
                 tadc = el.directory.tadc
                 tadc.get_event(event_number, adc_run_number)
 
-                ADC_traces = np.asarray(tadc.trace_ch, dtype=float)
+                trigg_ant_mask = nutrig_result["trigg_ant_mask"]
 
-                t0 = ext.compute_t0_sims(tadc)
+                # Full simulation event
+                ADC_traces_all = np.asarray(tadc.trace_ch, dtype=float)
+                t0_all = np.asarray(ext.compute_t0_sims(tadc), dtype=float)
 
                 trun = el.directory.trun
                 du_indices = tadc.get_dus_indices_in_run(trun)
-                Xants = get_antenna_positions_from_run(trun, du_indices)
+                Xants_all = np.asarray(
+                    get_antenna_positions_from_run(trun, du_indices),
+                    dtype=float,
+                )
+
+                # Keep exactly the same triggered DUs everywhere
+                ADC_traces = ADC_traces_all[trigg_ant_mask]
+                t0 = t0_all[trigg_ant_mask]
+                Xants = Xants_all[trigg_ant_mask]
 
                 logger.debug(
-                    "Simulation event %s: Event run=%s, TADC run=%s, ADC shape=%s",
+                    "Simulation event %s: total=%d, triggered=%d, "
+                    "ADC=%s, t0=%s, Xants=%s",
                     event_number,
-                    run_number,
-                    adc_run_number,
+                    len(trigg_ant_mask),
+                    np.count_nonzero(trigg_ant_mask),
                     ADC_traces.shape,
+                    t0.shape,
+                    Xants.shape,
                 )
 
                 t0 = ext.compute_t0_sims(tadc)

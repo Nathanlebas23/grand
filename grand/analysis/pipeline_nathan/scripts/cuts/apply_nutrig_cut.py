@@ -17,6 +17,8 @@ from grand.analysis.pipeline_nathan.scripts.cuts.compute_nutrig import (
     compute_flt_correlation,
     compute_rho_event_score,
 )
+from grand.analysis.pipeline_nathan.scripts.sims_utils import trigger_adc, dict_trigger_parameter
+
 
 
 logger = logging.getLogger("grand.process")
@@ -57,7 +59,26 @@ def compute_nutrig_event(
 
     if adc_traces is not None:
         ADC_traces = np.asarray(adc_traces, dtype=float)
+
+        trigg_antennas = [
+            trigger_adc(
+                ADC_traces[i_ant],
+                trigger_dict=dict_trigger_parameter,
+                dt_ns=2.0,
+            )
+            for i_ant in range(len(ADC_traces))
+        ]
+
+        trigg_ant_mask = np.array(
+            [len(channels) > 0 for channels in trigg_antennas],
+            dtype=bool,
+        )
+
+        ADC_traces = ADC_traces[trigg_ant_mask]
         n_antennas = len(ADC_traces)
+
+        logger.debug(f"Simulation: {n_antennas} trigered antennas.")
+
     else:
         ADC_traces = np.array(
             [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
@@ -67,8 +88,9 @@ def compute_nutrig_event(
     # n_antennas = len(e.voltages)
 
 
-    logger.debug(f"ADC_traces shape: {ADC_traces.shape} (simulation mode)")
-        
+    logger.debug(f"ADC_traces shape: {ADC_traces.shape}")
+
+    trigg_ant_mask = np.ones(n_antennas, dtype=bool)
     rho_x = np.full(n_antennas, np.nan, dtype=float)
     rho_y = np.full(n_antennas, np.nan, dtype=float)
     result_x: List[Optional[Dict[str, Any]]] = [None] * n_antennas
@@ -122,6 +144,7 @@ def compute_nutrig_event(
         "rho_mean": rho_mean,
         "n_valid": n_valid,
         "ADC_traces": ADC_traces,
+        "trigg_ant_mask": trigg_ant_mask,
         "result_x": result_x,
         "result_y": result_y,
     }
