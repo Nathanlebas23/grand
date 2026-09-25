@@ -8,12 +8,11 @@ sys.path.insert(0, str(GRAND_ROOT))
 import argparse
 import logging
 from setup_logger import setup_logger
-from loading import load_config, load_antenna_positions, load_nutrig_template, natural_sort_key, load_sims_rootfiles_path
+from loading import load_config, load_antenna_positions, load_nutrig_template, natural_sort_key, get_sims_rootfiles_path
 from process_file import process_file
 from cuts.compute_nutrig import is_flt_available
 
 logger = logging.getLogger("grand.process")
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -124,26 +123,7 @@ def main():
         logger.info("Running in simulation mode.")
         logger.info(f"Input directory: {input_dir}")
 
-        # # Le numero CLI est le SUFFIXE du dossier de simulation, pas un index de liste :
-        # # 12 -> *_0012. Un index 0-based casserait des que la serie a des trous.
-        # pattern = f"*_{args.file_number:04d}"
-        # sim_dirs = sorted(d for d in input_dir.glob(pattern) if d.is_dir())
-
-        # if not sim_dirs:
-        #     raise FileNotFoundError(
-        #         f"No simulation directory matching '{pattern}' in {input_dir}"
-        #     )
-        # # Les variantes -AN_/-NJ_ partagent le meme suffixe : refuser plutot que
-        # # d'en choisir une silencieusement.
-        # if len(sim_dirs) > 1:
-        #     raise RuntimeError(
-        #         f"Ambiguous simulation index {args.file_number}: {len(sim_dirs)} directories "
-        #         f"match '{pattern}' in {input_dir}: " + ", ".join(d.name for d in sim_dirs)
-        #     )
-
-        # rootfile_path = sim_dirs[0]
-
-        rootfile_path = load_sims_rootfiles_path(input_dir, args.file_number)
+        rootfile_path = get_sims_rootfiles_path(input_dir, args.file_number)
         logger.info(f"Selected simulation directory: {rootfile_path.name}")
     else:
         logger.info("Running in real data mode.")

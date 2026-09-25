@@ -58,15 +58,16 @@ def compute_nutrig_event(
         )
 
     if adc_traces is not None:
-        ADC_traces = np.asarray(adc_traces, dtype=float)
+
+        ADC_traces_all = np.asarray(adc_traces, dtype=float)
 
         trigg_antennas = [
             trigger_adc(
-                ADC_traces[i_ant],
+                ADC_traces_all[i_ant],
                 trigger_dict=dict_trigger_parameter,
                 dt_ns=2.0,
             )
-            for i_ant in range(len(ADC_traces))
+            for i_ant in range(len(ADC_traces_all))
         ]
 
         trigg_ant_mask = np.array(
@@ -74,23 +75,34 @@ def compute_nutrig_event(
             dtype=bool,
         )
 
-        ADC_traces = ADC_traces[trigg_ant_mask]
-        n_antennas = len(ADC_traces)
+        logger.debug(
+            "Simulation: %d triggered antennas / %d total.",
+            np.count_nonzero(trigg_ant_mask),
+            len(trigg_ant_mask),
+        )
 
-        logger.debug(f"Simulation: {n_antennas} trigered antennas.")
+        ADC_traces = ADC_traces_all[trigg_ant_mask]
+
+        # IMPORTANT
+        n_antennas = len(ADC_traces)
 
     else:
         ADC_traces = np.array(
-            [ext.convert_voltage_to_ADC(v.trace, channels=[0, 1, 2]) for v in e.voltages]
+            [
+                ext.convert_voltage_to_ADC(
+                    v.trace,
+                    channels=[0, 1, 2],
+                )
+                for v in e.voltages
+            ]
         )
-        n_antennas = len(e.voltages)
 
-    # n_antennas = len(e.voltages)
+        n_antennas = len(ADC_traces)
+        trigg_ant_mask = np.ones(n_antennas, dtype=bool)
 
 
     logger.debug(f"ADC_traces shape: {ADC_traces.shape}")
 
-    trigg_ant_mask = np.ones(n_antennas, dtype=bool)
     rho_x = np.full(n_antennas, np.nan, dtype=float)
     rho_y = np.full(n_antennas, np.nan, dtype=float)
     result_x: List[Optional[Dict[str, Any]]] = [None] * n_antennas
@@ -145,6 +157,7 @@ def compute_nutrig_event(
         "n_valid": n_valid,
         "ADC_traces": ADC_traces,
         "trigg_ant_mask": trigg_ant_mask,
+        "n_antennas": n_antennas,
         "result_x": result_x,
         "result_y": result_y,
     }

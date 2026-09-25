@@ -11,7 +11,6 @@ import logging
 # Load GRANDlib and nl_style
 #-------------------------------
 from grand.analysis.pipeline_nathan.scripts.loading import load_config
-from grand.analysis.pipeline_nathan.analysis.event_analysis import determine_dead_or_alive_DUs
 
 config_path = Path(__file__).parent.parent / "config.yaml"
 config = load_config(config_path)
@@ -36,9 +35,17 @@ def plot_ADC_vs_omega(
     ftit_adf,
     plot_dir,
     ):
-    """Plot ADC peak amplitude vs angle omega and ADF model."""
+    """Plot ADC peak amplitude vs angle omega, the ADF model, and their residuals.
 
-    fig, ax = plt.subplots()
+    peak_amps    : amplitudes mesurees dans les traces ADC (simulees en mode simulation),
+                   ce n'est PAS une amplitude de verite MC.
+    adf_amplitude : modele ADF evalue aux memes DUs.
+    """
+
+    fig, (ax, ax_res) = plt.subplots(
+        2, 1, sharex=True, figsize=(7.4, 6.0),
+        gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08},
+    )
 
     omega_deg = np.rad2deg(t_recons.omega)
     peak_amps = np.asarray(t_recons.peak_amps)
@@ -48,7 +55,7 @@ def plot_ADC_vs_omega(
         omega_deg,
         peak_amps,
         "ob",
-        label="max ADC @ DU",
+        label="Simulated ADC data",
         zorder=10,
     )
 
@@ -65,7 +72,7 @@ def plot_ADC_vs_omega(
         omega_deg,
         adf_amplitude,
         "+r",
-        label="ADF fit @ DU",
+        label="ADF fit @ DU", 
     )
 
     ax.axvline(
@@ -94,9 +101,16 @@ def plot_ADC_vs_omega(
     omega_max_plot = 1.1 * np.nanmax(omega_deg)
     ax.set_xlim(0, omega_max_plot)
 
-    ax.set_xlabel(r"$\omega$ [deg]")
     ax.set_ylabel("Voltage (ADC)")
     ax.legend(frameon=False, loc="best")
+
+    # ----- panneau de residus : donnees ADC simulees - modele ADF -----
+    residuals = peak_amps - adf_amplitude
+
+    ax_res.plot(omega_deg, residuals, "ob")
+    ax_res.axhline(0, linestyle="--", color=NL_COLORS["black"])
+    ax_res.set_xlabel(r"$\omega$ [deg]")
+    ax_res.set_ylabel(r"$Amp_{\rm simulated}$-$Amp_{\rm reconstructed}$\n [ADC]")
 
     fig.suptitle(fsuptit, fontsize=10)
     ax.set_title(ftit_adf)
@@ -120,12 +134,18 @@ def plot_footprint(
     fsuptit,
     ftit_adf,
     plot_dir,
+    is_simulation=False,
 ):
     """Plot the 2D footprint of the event on the ground."""
 
-    distm = 5  # distance in k_meters
-    xmin, xmax = -distm, distm
-    ymin, ymax = -distm, distm
+    if is_simulation:
+        distm = 20  # distance in k_meters
+        xmin, xmax = -distm, distm
+        ymin, ymax = -distm, distm
+    else:    
+        distm = 5  # distance in k_meters
+        xmin, xmax = -distm, distm
+        ymin, ymax = -distm, distm
 
     fig, ax = plt.subplots()
 
@@ -141,18 +161,14 @@ def plot_footprint(
         label="Triggered DUs",
     )
 
-    # All DUs on site
-    alive_DUs, dead_DUs = determine_dead_or_alive_DUs(t_recons)
-    logger.info(f"Alive DUs: {alive_DUs}, Dead DUs: {dead_DUs}")
-
-    
-    ax.scatter(
-        -antenna_position["y"] / 1000,
-        antenna_position["x"] / 1000,
-        marker="+",
-        color=NL_COLORS["black"],
-        label="DUs on site",
-    )
+    if  not is_simulation:
+        ax.scatter(
+            -antenna_position["y"] / 1000,
+            antenna_position["x"] / 1000,
+            marker="+",
+            color=NL_COLORS["black"],
+            label="DUs on site",
+        )
 
     fig.colorbar(sc, ax=ax, label="Peak amplitude (ADC)")
 
@@ -299,7 +315,7 @@ def plot_footprint(
 
     plt.close(fig)
 
-def plot_event(t_recons, results: dict, antenna_position, plot_dir) -> None:
+def plot_event(t_recons, results: dict, antenna_position, plot_dir, is_simulation) -> None:
     """Produce the ADC-vs-omega and footprint plots for one already-analyzed event."""
     plot_ADC_vs_omega(
         t_recons, results["omega_cr_mean"], results["w"], results["adf_f"],
@@ -307,8 +323,15 @@ def plot_event(t_recons, results: dict, antenna_position, plot_dir) -> None:
     )
     plot_footprint(
         t_recons, antenna_position, results["Xants"], results["K"], results["Xcore"],
-        results["x_ell"], results["omega_cr_mean"], results['omega_ell_min'], results['omega_ell_max'], results['x_ell_min'], results['x_ell_max'], results["fsuptit"], results["ftit_adf"], plot_dir,
+        results["x_ell"], results["omega_cr_mean"], results['omega_ell_min'], results['omega_ell_max'], results['x_ell_min'], results['x_ell_max'], results["fsuptit"], results["ftit_adf"], plot_dir, is_simulation
     )
+
+    if results.get("simulation_comparison") is not None:
+        plot_simulation_comparison(
+            t_recons,
+            results["simulation_comparison"],
+            plot_dir,
+        )
 
 def plot_timing_residuals(t_recons, timing: dict, plot_dir) -> None:
     """Plot measured-vs-model peak times and residuals for PWF and SWF, one figure per event."""
@@ -348,3 +371,60 @@ def plot_timing_residuals(t_recons, timing: dict, plot_dir) -> None:
     fig.savefig(plot_dir/ f"timing_residuals_event_{t_recons.event_number}_run_{t_recons.run_number}.png")
     plt.close(fig)
 
+
+def plot_simulation_comparison(
+    t_recons,
+    comparison,
+    plot_dir,
+):
+    """Erreurs de reconstruction vis-a-vis de la verite MC.
+
+    Deux panneaux seulement, limites a ce qui est physiquement valide :
+    erreur angulaire (PWF/SWF/ADF) et energie. Pas de coeur (reperes MC et reco pas
+    encore reconcilies), pas de Xmax (xmax_pos_shc est dans le repere gerbe),
+    pas de vecteur direction (branche vide dans cette production).
+    """
+
+    if comparison is None:
+        return
+
+    fig, axs = plt.subplots(1, 2, figsize=(9, 4))
+
+    # ----- panneau 1 : erreur angulaire par methode -----
+    labels = ["PWF", "SWF", "ADF"]
+    angular_errors = [
+        comparison["angular_error_pwf_deg"],
+        comparison["angular_error_swf_deg"],
+        comparison["angular_error_adf_deg"],
+    ]
+
+    axs[0].bar(labels, angular_errors, color=NL_COLORS["blue"])
+    axs[0].set_ylabel(r"Angular error $\Delta\Psi$ [deg]")
+    axs[0].set_title("Direction reconstruction")
+    axs[0].grid(axis="y", alpha=0.3)
+
+    # ----- panneau 2 : energie -----
+    ratio = comparison["energy_ratio"]
+    rel_percent = 100.0 * comparison["energy_relative_error"]
+
+    axs[1].bar([r"$(E_{\rm reco}-E_{\rm sim})/E_{\rm sim}$"],
+               [rel_percent], color=NL_COLORS["orange"])
+    axs[1].axhline(0, linestyle="--", color=NL_COLORS["black"])
+    axs[1].set_ylabel("Relative energy error [%]")
+    axs[1].set_title(rf"$E_{{\rm reco}}/E_{{\rm sim}} = {ratio:.2f}$")
+    axs[1].grid(axis="y", alpha=0.3)
+
+    fig.suptitle(
+        f"Simulation vs reconstruction - "
+        f"Event {t_recons.event_number} - Run {t_recons.run_number}"
+    )
+    fig.tight_layout()
+    fig.savefig(
+        plot_dir
+        / (
+            f"simulation_comparison_event_"
+            f"{t_recons.event_number}_"
+            f"run_{t_recons.run_number}.png"
+        )
+    )
+    plt.close(fig)

@@ -60,17 +60,27 @@ def load_nutrig_template(template_path: str) -> np.ndarray:
     return template
 
 
-def get_trecons_path(paths_cfg, file_number: int) -> tuple[Path, Path]:
+def get_trecons_path(paths_cfg, file_number: int, is_simulation: bool = False) -> tuple[Path, Path]:
     input_dir = Path(paths_cfg["input_dir"])
-    rootfiles = sorted(input_dir.glob("*.root"), key=natural_sort_key)
-    if not rootfiles:
-        raise RuntimeError(f"No ROOT files found in {input_dir}")
-    if file_number < 0 or file_number >= len(rootfiles):
-        raise IndexError(
-            f"ROOT file number {file_number} is out of range. "
-            f"Found {len(rootfiles)} ROOT files."
-        )
-    rootfile_path = rootfiles[file_number]
+
+    if is_simulation:
+        # Meme convention que scripts/main.py : 12 -> *_0012 (et non un index de liste).
+        # rootfile_path est ici le DOSSIER de simulation, pas un fichier : input_dir ne
+        # contient que des sous-dossiers sim_*, donc glob("*.root") n'y trouve rien.
+        rootfile_path = get_sims_rootfiles_path(input_dir, file_number)
+    else:
+        rootfiles = sorted(input_dir.glob("*.root"), key=natural_sort_key)
+        if not rootfiles:
+            raise RuntimeError(f"No ROOT files found in {input_dir}")
+        if file_number < 0 or file_number >= len(rootfiles):
+            raise IndexError(
+                f"ROOT file number {file_number} is out of range. "
+                f"Found {len(rootfiles)} ROOT files."
+            )
+        rootfile_path = rootfiles[file_number]
+
+    # Queue commune aux deux modes : Path.stem == Path.name pour un dossier sans point,
+    # donc ceci reproduit exactement ce que main.py/process_file.py ecrivent.
     output_dir = Path(paths_cfg["output_dir"]) / rootfile_path.stem
     trecons_path = output_dir / f"{rootfile_path.stem}_trecons.root"
     if not trecons_path.is_file():
@@ -88,7 +98,7 @@ def log_memory(label):
         plt.get_fignums(),
     )
 
-def load_sims_rootfiles_path(input_dir, file_number: int) -> Path:
+def get_sims_rootfiles_path(input_dir, file_number: int) -> Path:
     pattern = f"*_{file_number:04d}"
     sim_dirs = sorted(d for d in input_dir.glob(pattern) if d.is_dir())
 
@@ -112,3 +122,24 @@ def get_run_number(rootfile_path, e):
     if match:
         return int(match.group(3))
     return e.run_number
+
+
+# 1. Est-ce que je parle d'un FICHIER ?
+#    shower_xxx.root
+
+# 2. Est-ce que je parle d'un TREE ?
+#    tshower
+
+# 3. Est-ce que je parle du WRAPPER Python du Tree ?
+#    e.tshower / e.tsimshower / tadc / trun
+
+# 4. Est-ce que je parle d'un OBJET PHYSIQUE Python ?
+#    e.shower / e.antennas
+
+# shower_....root   fichier
+# tshower           TTree
+# TShower           classe Python wrapper
+# e.tshower         instance du wrapper L1
+# e.tsimshower      instance liée au shower simulation L0
+# e.shower          objet physique Python
+# trecons           ton wrapper TRecons

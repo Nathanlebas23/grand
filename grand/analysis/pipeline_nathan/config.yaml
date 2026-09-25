@@ -32,3 +32,5 @@ cuts:
   high_omega_excess:
     omega_excess_threshold: 1.45 # deg
     amlpitude_excess_threshold: 50 # ADC
+  fill_ratio_cut:
+    threshold: 0.5

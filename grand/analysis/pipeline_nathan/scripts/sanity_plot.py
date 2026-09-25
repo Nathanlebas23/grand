@@ -26,7 +26,7 @@ set_style()
 ## Le peak time est celui obtenue par reconstruction.py
 ## 
 
-def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=None, t0_ns=None):
+def plot_traces(e, output_dir, peak_times, ADC_traces, nutrig_result, t0_ns, n_antennas) -> None:
     """
     Plot X/Y/Z ADC traces for every triggered antenna.
 
@@ -44,10 +44,6 @@ def plot_traces(e, output_dir, peak_times=None, ADC_traces=None, nutrig_result=N
     the per-DU rho_x/rho_y/rho_max title and the FLT best-fit template overlay on the
     X/Y channels (via result_x/result_y + rescale_template_for_trace).
     """
-
-  
-    n_antennas = len(e.antennas)
-
     # t0_rel_ns matches reconstruction.py's own t0 computation exactly, needed to convert
     # peak_times (relative to the event's earliest-triggering antenna) back to each
     # antenna's local 0-based trace axis.
