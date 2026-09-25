@@ -101,7 +101,7 @@ def plot_ADC_vs_omega(
     omega_max_plot = 1.1 * np.nanmax(omega_deg)
     ax.set_xlim(0, omega_max_plot)
 
-    ax.set_ylabel("Voltage (ADC)")
+    ax.set_ylabel("Voltage [ADC]")
     ax.legend(frameon=False, loc="best")
 
     # ----- panneau de residus : donnees ADC simulees - modele ADF -----
@@ -110,7 +110,7 @@ def plot_ADC_vs_omega(
     ax_res.plot(omega_deg, residuals, "ob")
     ax_res.axhline(0, linestyle="--", color=NL_COLORS["black"])
     ax_res.set_xlabel(r"$\omega$ [deg]")
-    ax_res.set_ylabel(r"$Amp_{\rm simulated}$-$Amp_{\rm reconstructed}$\n [ADC]")
+    ax_res.set_ylabel("Residuals [ADC]")
 
     fig.suptitle(fsuptit, fontsize=10)
     ax.set_title(ftit_adf)
@@ -131,12 +131,19 @@ def plot_footprint(
     omega_ell_max,
     x_ell_min,
     x_ell_max,
+    fill_ratio,
     fsuptit,
     ftit_adf,
     plot_dir,
     is_simulation=False,
+    dead_du_ids=None,
 ):
-    """Plot the 2D footprint of the event on the ground."""
+    """Plot the 2D footprint of the event on the ground.
+
+    dead_du_ids : DU de la table de reference n'apparaissant dans aucun evenement du
+    fichier ROOT (donnees reelles uniquement). None -> comportement d'origine, une
+    seule couche "DUs on site".
+    """
 
     if is_simulation:
         distm = 20  # distance in k_meters
@@ -162,13 +169,31 @@ def plot_footprint(
     )
 
     if  not is_simulation:
+        dead_mask = (
+            antenna_position["DU_id"].isin(dead_du_ids)
+            if dead_du_ids
+            else np.zeros(len(antenna_position), dtype=bool)
+        )
+
+        alive = antenna_position[~dead_mask]
         ax.scatter(
-            -antenna_position["y"] / 1000,
-            antenna_position["x"] / 1000,
+            -alive["y"] / 1000,
+            alive["x"] / 1000,
             marker="+",
             color=NL_COLORS["black"],
-            label="DUs on site",
+            label=f"DUs on site ({len(alive)})",
         )
+
+        if np.any(dead_mask):
+            dead = antenna_position[dead_mask]
+            ax.scatter(
+                -dead["y"] / 1000,
+                dead["x"] / 1000,
+                marker="x",
+                color=NL_COLORS["red"],
+                alpha=0.7,
+                label=f"Dead DUs ({len(dead)})",
+            )
 
     fig.colorbar(sc, ax=ax, label="Peak amplitude (ADC)")
 
@@ -305,6 +330,15 @@ def plot_footprint(
     #     fontsize=9,
     # )
 
+    ax.text(
+    0.02,
+    0.98,
+    f"Fill ratio = {fill_ratio:.2f}",
+    transform=ax.transAxes,
+    ha="left",
+    va="top",
+    )   
+
     ax.legend(frameon=False, loc="best", fontsize=9)
 
     fig.savefig(
@@ -315,15 +349,20 @@ def plot_footprint(
 
     plt.close(fig)
 
-def plot_event(t_recons, results: dict, antenna_position, plot_dir, is_simulation) -> None:
-    """Produce the ADC-vs-omega and footprint plots for one already-analyzed event."""
+def plot_event(t_recons, results: dict, antenna_position, plot_dir, is_simulation, dead_du_ids=None) -> None:
+    """Produce the ADC-vs-omega and footprint plots for one already-analyzed event.
+
+    dead_du_ids : liste des DU de la table de reference absentes de tout le fichier ROOT
+    (donnees reelles uniquement, cf. loading.get_dead_du_ids). None -> couche non tracee.
+    """
     plot_ADC_vs_omega(
         t_recons, results["omega_cr_mean"], results["w"], results["adf_f"],
         results["fsuptit"], results["ftit_adf"], plot_dir,
     )
     plot_footprint(
         t_recons, antenna_position, results["Xants"], results["K"], results["Xcore"],
-        results["x_ell"], results["omega_cr_mean"], results['omega_ell_min'], results['omega_ell_max'], results['x_ell_min'], results['x_ell_max'], results["fsuptit"], results["ftit_adf"], plot_dir, is_simulation
+        results["x_ell"], results["omega_cr_mean"], results['omega_ell_min'], results['omega_ell_max'], results['x_ell_min'], results['x_ell_max'], results['fill_ratio'], results["fsuptit"], results["ftit_adf"], plot_dir, is_simulation,
+        dead_du_ids=dead_du_ids,
     )
 
     if results.get("simulation_comparison") is not None:

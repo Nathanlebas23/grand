@@ -9,9 +9,10 @@ GRAND_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(GRAND_ROOT))
 
 from grand.dataio import TRecons, DataDirectory
-from grand.analysis.pipeline_nathan.scripts.loading import load_config, load_antenna_positions, get_trecons_path
+from grand.analysis.pipeline_nathan.scripts.loading import load_config, load_antenna_positions, get_trecons_path, get_dead_du_ids
 from grand.analysis.pipeline_nathan.analysis.plotting import plot_event, plot_timing_residuals
 from grand.analysis.pipeline_nathan.analysis.event_analysis import analyze_event, compute_timing_residuals, get_simulation_truth
+from grand.analysis.pipeline_nathan.scripts.setup_logger import setup_logger
 
 logger = logging.getLogger("grand.process")
 
@@ -44,8 +45,32 @@ def main():
     )
     args = parser.parse_args()
 
+
+    # ----------------------------------
+    # Load configuration paths and cuts
+    # ----------------------------------
     config = load_config(args.config)
     paths_cfg = config["paths"]
+
+    config = load_config(args.config)
+
+    log_cfg = config.get("logging", {})
+    setup_logger(level=log_cfg.get("level", "INFO"), log_file=log_cfg.get("log_file"))
+    logger.info(f"Config loaded from {args.config}")
+
+
+    cuts_cfg = config["cuts"]
+    fill_ratio_cut = cuts_cfg["fill_ratio_cut"]["threshold"]
+    logger.info(f"Fill ratio cut threshold: {fill_ratio_cut}")
+
+
+
+
+    logger.info("------------------------------------------------------------------------")
+    logger.info("------------------- STARTING ANALYSIS PIPELINE -------------------------")
+    logger.info("------------------------------------------------------------------------")
+    
+    
 
     ##################################################
     # Select the same input ROOT file as scripts/main.py
@@ -56,19 +81,21 @@ def main():
         paths_cfg, args.file_number, is_simulation=args.simulation,
     )
 
-    # Communs aux deux modes : t_sim est lu plus bas quel que soit le mode, et
-    # antenna_position est passe a plot_event dans les deux branches.
     t_sim = None
     t_recons = TRecons(str(trecons_path))
     antenna_position = load_antenna_positions(paths_cfg["rtk_antenna_positions_path"])
 
+    dead_du_ids = None
+    if not args.simulation:
+        dead_du_ids, present_du_ids = get_dead_du_ids(rootfile_path, antenna_position)
+        logger.info(
+            "DUs: %d in reference, %d present in file, %d dead -> %s",
+            len(antenna_position), len(present_du_ids), len(dead_du_ids), dead_du_ids,
+        )
+
     if args.simulation:
         logger.info(f"Analyzing simulation TRecons file: {trecons_path}")
 
-        # DataDirectory agrege les shower_*_L0_*.root du dossier en un TChain AVEC
-        # BuildIndex (data_handling.py:276-285), donc get_event(ev, run) couvre tous
-        # les evenements. NE PAS utiliser TShower(glob) : ce chemin construit un TChain
-        # sans index (data_tree.py:366-372) et get_event() y echoue systematiquement.
         sim_dir = DataDirectory(str(rootfile_path))
         t_sim = sim_dir.tshower_l0
         if t_sim is None:
@@ -90,6 +117,11 @@ def main():
     ##################################################
     # Analyze and plot the selected event(s)
     ##################################################
+
+    n_fill_pass = 0
+    n_fill_fail = 0
+    n_fill_invalid = 0
+    
     if args.event_number is not None:
         logger.info(f"Analyzing event {args.event_number} in TRecons file {t_recons.file_name}")
         events = t_recons.get_list_of_events()
@@ -118,11 +150,32 @@ def main():
             ev_no,
             run_no,
             config,
-            sim_truth=sim_truth,
+            sim_truth=sim_truth
         )
 
-        # results = analyze_event(t_recons, ev_no, run_no, config, is_simulation=args.simulation)
-        plot_event(t_recons, results, antenna_position, plot_dir, is_simulation=args.simulation)
+        fill_ratio = results["fill_ratio"]
+
+        if not np.isfinite(fill_ratio):
+            n_fill_invalid += 1
+            logger.info(
+                "Event %s: invalid fill ratio -> no plot",
+                ev_no,
+            )
+            pass
+
+        if fill_ratio < fill_ratio_cut:
+            n_fill_fail += 1
+            logger.info(
+                "Event %s: fill_ratio=%.3f < %.3f -> rejected",
+                ev_no,
+                fill_ratio,
+                fill_ratio_cut,
+            )
+            pass
+
+        n_fill_pass += 1
+        
+        plot_event(t_recons, results, antenna_position, plot_dir, is_simulation=args.simulation, dead_du_ids=dead_du_ids)
 
         # --------------------
         # Timing residuals
@@ -149,14 +202,41 @@ def main():
                 ev_no,
                 run_no,
                 config,
-                sim_truth=sim_truth,
+                sim_truth=sim_truth
             )
 
+            fill_ratio = results["fill_ratio"]
 
+            if not np.isfinite(fill_ratio):
+                n_fill_invalid += 1
+                logger.info(
+                    "Event %s: invalid fill ratio -> no plot",
+                    ev_no,
+                )
+                continue
 
-            # results = analyze_event(t_recons, ev_no, run_no, config)
-            plot_event(t_recons, results, antenna_position, plot_dir, is_simulation=args.simulation)
+            if fill_ratio < fill_ratio_cut:
+                n_fill_fail += 1
+                logger.info(
+                    "Event %s: fill_ratio=%.3f < %.3f -> rejected",
+                    ev_no,
+                    fill_ratio,
+                    fill_ratio_cut,
+                )
+                continue
 
+            n_fill_pass += 1
+            
+            plot_event(t_recons, results, antenna_position, plot_dir, is_simulation=args.simulation, dead_du_ids=dead_du_ids)
+        
+        
+        logger.info(
+            "Fill-ratio cut %.2f: passed=%d, failed=%d, invalid=%d",
+            fill_ratio_cut,
+            n_fill_pass,
+            n_fill_fail,
+            n_fill_invalid,
+        )
             # --------------------
             # Timing residuals
             #---------------------            

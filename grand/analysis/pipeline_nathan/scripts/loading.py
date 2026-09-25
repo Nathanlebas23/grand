@@ -12,6 +12,8 @@ import yaml
 import resource
 import matplotlib.pyplot as plt
 
+from grand.dataio import TADC
+
 
 logger = logging.getLogger("grand.process")
 
@@ -116,6 +118,19 @@ def get_sims_rootfiles_path(input_dir, file_number: int) -> Path:
     rootfile_path = sim_dirs[0]
 
     return rootfile_path
+
+def get_dead_du_ids(rootfile_path, antenna_position):
+    """
+
+    Returns
+    -------
+    (dead_du_ids, present_du_ids) : deux listes triees d'int
+    """
+    tadc = TADC(str(rootfile_path))
+    present = {int(d) for d in tadc.get_list_of_dus()}
+    reference = {int(d) for d in antenna_position["DU_id"]}
+    return sorted(reference - present), sorted(present)
+
 
 def get_run_number(rootfile_path, e):
     match = re.search(r'GP80_(\d{4})(\d{2})\d{2}_\d+_RUN(\d+)_', Path(rootfile_path).name)
