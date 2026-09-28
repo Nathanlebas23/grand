@@ -189,7 +189,12 @@ def newton(func,x0,tol=1e-7,nstep_max = 100, args = [], verbose=False):
     xold = x0
     nstep = 0
     while ((rel_error > tol) and (nstep<nstep_max)):
-        derivative = der(func,xold,args=args) if np.abs(der(func,xold,args=args)) > 1e-12 else 1e-12  # Avoid division by zero
+
+        # der() evaluated once per iteration (it was computed twice: in the test and in the value)
+        d = der(func,xold,args=args)
+        derivative = d if np.abs(d) > 1e-12 else 1e-12  # Avoid division by zero
+
+        # derivative = der(func,xold,args=args) if np.abs(der(func,xold,args=args)) > 1e-12 else 1e-12  # Avoid division by zero
         x = xold - func(xold,*args)/derivative
         nstep += 1
         if verbose==True:
