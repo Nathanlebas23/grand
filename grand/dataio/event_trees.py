@@ -1117,12 +1117,9 @@ class TRecons(MotherEventTree):
     crb_azimuth_pwf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
 
     ## Event fill ratio used by the footprint selection.
-    fill_ratio: TTreeScalarDesc = field(
-        default=TTreeScalarDesc(np.float32)
-    )
+    fill_ratio: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
 
     ## Polarization observable for each triggered DU.
-    polarization: TTreeVectorDesc = field(
-        default=TTreeVectorDesc(np.float32)
-    )
+    polarization: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+
 
