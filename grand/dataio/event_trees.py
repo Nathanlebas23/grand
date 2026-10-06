@@ -1041,6 +1041,7 @@ class TRecons(MotherEventTree):
     ## Non-reduced chi² from PWF
     ## Divide by du_count to obtain the reduced chi²
     chi2_pwf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+    chi2_pwf_red: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
 
     # Spherical Wave Fits (SWF) Reconstruction outputs 
     ## polar zenith from SWF (in rad) 
@@ -1060,6 +1061,7 @@ class TRecons(MotherEventTree):
     ## Non-reduced chi² from SWF
     ## Divide by du_count to obtain the reduced chi²
     chi2_swf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+    chi2_swf_red: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
     ## Distance between the reconstructed Xsource and each antenna (in meters)
     distance_source_antenna:  StdVectorListDesc = field(default=StdVectorListDesc("float"))
 
@@ -1077,6 +1079,7 @@ class TRecons(MotherEventTree):
     ## Non-reduced chi² from ADF
     ## Divide by du_count to obtain the reduced chi²
     chi2_adf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+    chi2_adf_red: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
     ## Azimuth angle in the shower plane (in radians)
     eta: StdVectorListDesc = field(default=StdVectorListDesc("float"))
     ## Angular distance to the shower axis (in radians)
@@ -1112,4 +1115,14 @@ class TRecons(MotherEventTree):
     crb_zenith_pwf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
     ## CRB of shower azimuth from PWF (in radians)
     crb_azimuth_pwf: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+
+    ## Event fill ratio used by the footprint selection.
+    fill_ratio: TTreeScalarDesc = field(
+        default=TTreeScalarDesc(np.float32)
+    )
+
+    ## Polarization observable for each triggered DU.
+    polarization: TTreeVectorDesc = field(
+        default=TTreeVectorDesc(np.float32)
+    )
 
