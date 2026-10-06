@@ -1120,6 +1120,4 @@ class TRecons(MotherEventTree):
     fill_ratio: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
 
     ## Polarization observable for each triggered DU.
-    polarization: TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
-
-
+    polarization: StdVectorListDesc = field(default=StdVectorListDesc("float"))
