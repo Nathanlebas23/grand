@@ -1121,3 +1121,7 @@ class TRecons(MotherEventTree):
 
     ## Polarization observable for each triggered DU.
     polarization: StdVectorListDesc = field(default=StdVectorListDesc("float"))
+
+    ## Whether the reconstructed event comes from simulation.
+    ## 0 = experimental data, 1 = simulation.
+    is_simulation: TTreeScalarDesc = field(default=TTreeScalarDesc(np.uint8))
