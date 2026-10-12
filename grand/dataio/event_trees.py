@@ -1122,12 +1122,10 @@ class TRecons(MotherEventTree):
     ## Polarization observable for each triggered DU.
     polarization: StdVectorListDesc = field(default=StdVectorListDesc("float"))
 
-
+    # Background noise estimation
+    background_chi2_red : TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
+    background_kappa : TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
 
     ## Whether the reconstructed event comes from simulation.
     ## 0 = experimental data, 1 = simulation.
     # is_simulation: TTreeScalarDesc = field(default=TTreeScalarDesc(np.uint8))
-
-    # Background noise estimation
-    background_chi2 : TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
-    background_kappa : TTreeScalarDesc = field(default=TTreeScalarDesc(np.float32))
