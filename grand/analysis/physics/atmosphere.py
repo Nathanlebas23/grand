@@ -74,3 +74,106 @@ def ZHSEffectiveRefractionIndex(X0,Xa):
         n_eff = 1. + 1e-6*avn # Effective (average) index
 
     return (n_eff)
+
+
+# --------------------------------------
+# For regularisation of the SWF fit
+# --------------------------------------
+@njit
+def DensityAtAltitude(h):
+    """
+    Atmospheric density at altitude h (m).
+
+    Returns
+    -------
+    rho : float
+        Density in g/cm³.
+    """
+
+    if h >= cons.h_top_atm:
+        return 0.
+
+    layer = 0
+
+    for i in range(1, 5):
+        if h >= cons.linsley_h[i]:
+            layer = i
+
+    b = cons.linsley_b[layer]
+    c = cons.linsley_c[layer]
+
+    if layer == 4:
+        return b / c
+
+    return b / c * np.exp(-h * 100. / c)
+
+
+@njit
+def SlantDepth(X0, u, nsteps=200):
+    """
+    Atmospheric depth from X0 to the top of the atmosphere.
+
+    Parameters
+    ----------
+    X0 : array (3,)
+        Starting position in m.
+    u : array (3,)
+        Unit direction towards the top of the atmosphere.
+    nsteps : int
+        Number of integration steps.
+
+    Returns
+    -------
+    X : float
+        Atmospheric depth in g/cm².
+    """
+
+    R = cons.earth_radius_m
+    h_top = cons.h_top_atm
+
+    # Position relative to Earth's center
+    qx = X0[0]
+    qy = X0[1]
+    qz = X0[2] + R
+
+    r0 = np.sqrt(qx**2 + qy**2 + qz**2)
+    h0 = r0 - R
+
+    if h0 >= h_top:
+        return 0.
+
+    if h0 < 0.:
+        return np.nan
+
+    # Intersection with the top of the atmosphere
+    b = qx*u[0] + qy*u[1] + qz*u[2]
+    c = r0**2 - (R + h_top)**2
+
+    if b < 0.:
+        return np.nan
+
+    s_top = -b + np.sqrt(b**2 - c)
+
+    # Trapezoidal integration
+    X = 0.
+    s_prev = 0.
+    rho_prev = DensityAtAltitude(h0)
+
+    for i in range(1, nsteps + 1):
+
+        s = s_top * (i / nsteps)**2
+
+        x = X0[0] + s*u[0]
+        y = X0[1] + s*u[1]
+        z = X0[2] + s*u[2]
+
+        h = np.sqrt(x**2 + y**2 + (z + R)**2) - R
+
+        rho = DensityAtAltitude(h)
+
+        X += 0.5 * (rho_prev + rho) * (s - s_prev) * 100.
+
+        s_prev = s
+        rho_prev = rho
+
+    return X

@@ -370,7 +370,23 @@ class TADC(MotherEventTree):
     ## Same as event_type, but event_type could consist of different triggered DUs
     trigger_flag: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
     """Same as event_type, but event_type could consist of different triggered DUs"""
-    ## Atmospheric temperature (read via I2C)
+
+
+    # # Nutrig corr values
+    # correlation_x: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
+    # """Nutrig corr values"""
+    # correlation_y: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
+    
+    
+    ## NUTRIG correlation with X
+    nutrig_rhox: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
+    """NUTRIG correlation with X"""
+
+    ## NUTRIG correlation with Y
+    nutrig_rhoy: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
+    """NUTRIG correlation with Y"""
+    
+    # ## Atmospheric temperature (read via I2C)
     atm_temperature: StdVectorListDesc = field(default=StdVectorListDesc("unsigned short"))
     """Atmospheric temperature (read via I2C)"""
     ## Atmospheric pressure
@@ -605,7 +621,6 @@ class TADC(MotherEventTree):
     ## Notch filter number
     notch_filters_no_ch: StdVectorListDesc = field(default=StdVectorListDesc("vector<unsigned char>"))
     """Notch filter number"""
-
 
 @dataclass
 ## The class for storing voltage traces and associated values for each event

@@ -20,7 +20,6 @@ def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
     Returns:
     - omega_cr : float -> Cherenkov angle in radians
     """
-
     # Compute coordinates of point before Xmax
     Xb = Xsource - delta*K
     # Compute coordinates of point after Xmax
@@ -55,6 +54,8 @@ def compute_Cerenkov(Xant, K, xsourceDist, Xsource, delta):
     omega_cr = newton(compute_delay, omega_cr_guess, args=(Xsource, Xa, Xb, Xant,U,K,alpha,delta, xsourceDist),verbose=False)
     ### DEBUG ###
     # omega_cr = omega_cr_guess
+    # Reject non-converged (NaN) or unphysical roots, e.g. when theta+omega > 90 deg
+
     return(omega_cr)
 
 @njit(**kwd)
@@ -95,7 +96,8 @@ def minor_equation(omega, n2, n1, alpha, delta, xmaxDist):
     Compute [c*delta(t)]^2    
     '''
     sa = np.sin(alpha)
-    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-10 else 1e-10 # Avoid division by zero for horizontal showers
+    saw = np.sin(alpha+omega)
+    saw = saw if np.abs(saw) > 1e-10 else 1e-10 # Avoid division by zero when observer ray is parallel to U
     com = np.cos(omega)
     l0 = xmaxDist*sa/saw
     l1 = np.sqrt(l0**2+delta**2+2*delta*l0*com)
@@ -138,7 +140,8 @@ def compute_observer_position(omega,Xmax,Xant,U,K,xmaxDist,alpha):
     # this assumed coincidence was computed at antenna altitude)
     #t = (Xant[2] - Xmax[2])/Dir_obs[2]
     # This assumes coincidence is computed at fixed alpha, i.e. along U, starting from Xcore
-    saw = np.sin(alpha+omega) if np.abs(alpha+omega) > 1e-10 else 1e-10 # Avoid division by zero for horizontal showers
+    saw = np.sin(alpha+omega)
+    saw = saw if np.abs(saw) > 1e-10 else 1e-10 # Avoid division by zero when observer ray is parallel to U
     t = np.sin(alpha)/saw * xmaxDist
     X = Xmax + t*Dir_obs
     return (X)
@@ -183,7 +186,7 @@ def newton(func,x0,tol=1e-7,nstep_max = 100, args = [], verbose=False):
     - verbose : bool -> print iteration info
 
     Returns:
-    - x : float -> estimated zero of func
+    - x : float -> estimated zero of func (NaN if not converged)
     """
     rel_error = np.inf
     xold = x0
@@ -204,6 +207,4 @@ def newton(func,x0,tol=1e-7,nstep_max = 100, args = [], verbose=False):
         else:
             rel_error = np.abs(x-xold)
         xold = x
-#    if (nstep == nstep_max):
-#        print ("Convergence not achieved in %d iterations"%nstep_max)
     return(x)

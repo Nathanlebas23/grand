@@ -171,6 +171,14 @@ class _FileEventBase:
         min_sec = du_s.min()
         du_ns = self.tt_event.du_nanoseconds.asnumpy().astype(np.float64) + 1e9 * (du_s - min_sec)
         return du_ns, min_sec
+    
+    def get_correlation(self):
+        """
+        Return correlation values of the event
+        """
+        correlation_x = self.tt_event.correlation_x.asnumpy()
+        correlation_y = self.tt_event.correlation_y.asnumpy()
+        return correlation_x, correlation_y 
 
     def get_obj_handling3dtraces(self):
         """
@@ -320,7 +328,6 @@ class FileEfield(_FileEventBase):
         o_tevent.set_unit_axis(r"$\mu$V/m", "cart")
         o_tevent.type_trace = "Efield"
         return o_tevent
-
 
 class FileVoltage(_FileEventBase):
     """

@@ -65,10 +65,11 @@ def SWF_loss(theta, phi, r_xmax, t_s, Xants, tants, sigma = None, cr=cons.c_ligh
         sigma = cr*sigma
     if sigma == None:
         return chi2
-    return(chi2/ (sigma**2)) # chi^2 normalized by sigma^2 and degrees of freedom (N-4)
+    return(chi2/ (sigma**2)) # chi^2( normalized by sigma^2 and degrees of freedom N-4)
 
 
-def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=42):
+def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=42, mu_xmax=None,
+sigma_xmax=None):
     """
     Perform a SWF reconstruction using differential evolution minimization.
 
@@ -97,11 +98,18 @@ def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=
         (theta_swf, phi_swf, r_xmax_swf, t_s_swf)
     """
 
+    if (mu_xmax is None) != (sigma_xmax is None):
+        raise ValueError("mu_xmax and sigma_xmax must be provided together")
+
+    if sigma_xmax is not None and sigma_xmax <= 0:
+        raise ValueError("sigma_xmax must be positive")
+
     # Parameter bounds for the differential evolution
     bounds = [[theta_pwf-5*np.pi/180,theta_pwf+5*np.pi/180],
                 [phi_pwf-5*np.pi/180,phi_pwf+5*np.pi/180], 
                 [0, 2000000],
                 [-2000000/cons.c_light, 0]]
+    
     #            [-15.6e3 - 12.3e3/np.cos(np.pi - theta_pwf),-6.1e3 - 15.4e3/np.cos(np.pi - theta_pwf)],
     #            [(6.1e3 + 15.4e3/np.cos(np.pi - theta_pwf)) / cons.c_light, 0]] 
     
@@ -111,9 +119,37 @@ def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=
     #        [-2000000/cons.c_light, 0]]
     
     
-    # Run the minimization
+    def objective(p):
+
+        chi2 = SWF_loss(
+            p[0], p[1], p[2], p[3],
+            Xants, tants, sigma
+        )
+
+        if mu_xmax is not None:
+            chi2 += Xmax_prior_loss(
+                p[0], p[1], p[2],
+                mu_xmax, sigma_xmax
+            )
+
+        return chi2
+
+
+    # # Run the minimization
+    # result = differential_evolution(
+    #     lambda p: SWF_loss(p[0], p[1], p[2], p[3], Xants, tants, sigma),
+    #     bounds=bounds,
+    #     maxiter=maxiter,
+    #     tol=1e-6,
+    #     mutation=(0.5, 1),
+    #     recombination=0.7,
+    #     seed=seed,
+    #     x0 = np.array(bounds, dtype=np.float64).mean(axis=1)
+    #     # disp=True
+    # )
+
     result = differential_evolution(
-        lambda p: SWF_loss(p[0], p[1], p[2], p[3], Xants, tants, sigma),
+        objective,
         bounds=bounds,
         maxiter=maxiter,
         tol=1e-6,
@@ -123,6 +159,7 @@ def recons_swf(theta_pwf, phi_pwf, tants, Xants, sigma=None, maxiter=3000, seed=
         x0 = np.array(bounds, dtype=np.float64).mean(axis=1)
         # disp=True
     )
+    
     # Extract best-fit parameters
     theta_swf, phi_swf, r_xmax_swf, t_s_swf = result.x
     
@@ -196,3 +233,62 @@ def SWF_model(theta, phi, r_xsource, t_s, Xants, groundAltitude=cons.groundAltit
         tants[i] = t_s + n_average / cr * np.linalg.norm(dX)
     return tants
 
+
+
+# ----------------------------
+# Add for regularisation
+# ----------------------------
+
+def compute_Xmax_grammage(theta, phi, r_xmax):
+    """
+    Compute atmospheric depth at the reconstructed SWF source.
+
+    Returns Xmax in g/cm².
+    """
+
+    X0 = compute_Xsource_cartesian_coords(
+        theta, phi, r_xmax
+    )[0]
+
+    Xground = np.array([
+        0.,
+        0.,
+        cons.groundAltitude,
+    ])
+
+    # Direction from ground towards the source
+    if r_xmax > 0:
+        u = (X0 - Xground) / r_xmax
+    else:
+        X1 = compute_Xsource_cartesian_coords(
+            theta, phi, 1.
+        )[0]
+        u = X1 - Xground
+
+    return phy.SlantDepth(X0, u)
+
+
+
+def Xmax_prior_loss(
+    theta,
+    phi,
+    r_xmax,
+    mu_xmax=750.,
+    sigma_xmax=100.,
+):
+    """
+    Gaussian prior on atmospheric Xmax.
+    """
+
+    # Prior intended for downward-going showers
+    if theta > np.pi / 2:
+        return 1e6
+
+    Xmax = compute_Xmax_grammage(
+        theta, phi, r_xmax
+    )
+
+    if not np.isfinite(Xmax):
+        return 1e6
+
+    return ((Xmax - mu_xmax) / sigma_xmax)**2
