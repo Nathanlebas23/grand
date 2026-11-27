@@ -48,8 +48,8 @@ def ADF_parameters(theta, phi, delta_omega, amplitude, Xants, Xsource, groundAlt
                          for i in range(Xants.shape[0])])
     
     # limit for small theta
-    if theta <70*np.pi/180: 
-            omega_cr = np.minimum(omega_cr, 0.6*np.pi/180)
+    # if theta <70*np.pi/180: 
+    #        omega_cr = np.minimum(omega_cr, 0.6*np.pi/180)
     adf = amplitude/l_ant / (1.+4.*( ((np.tan(omega)/np.tan(omega_cr))**2 - 1. )/delta_omega)**2)
     adf *= 1. + asym*np.cos(eta) # 
     
